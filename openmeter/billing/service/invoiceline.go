@@ -5,16 +5,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/samber/lo"
 
 	"github.com/openmeterio/openmeter/api"
 	"github.com/openmeterio/openmeter/openmeter/billing"
 	"github.com/openmeterio/openmeter/openmeter/billing/service/lineservice"
 	"github.com/openmeterio/openmeter/openmeter/customer"
+	"github.com/openmeterio/openmeter/pkg/clock"
 	"github.com/openmeterio/openmeter/pkg/currencyx"
 	"github.com/openmeterio/openmeter/pkg/framework/transaction"
 	"github.com/openmeterio/openmeter/pkg/pagination"
-	"github.com/openmeterio/openmeter/pkg/slicesx"
 	"github.com/openmeterio/openmeter/pkg/sortx"
 )
 
@@ -23,7 +24,6 @@ var _ billing.InvoiceLineService = (*Service)(nil)
 func (s *Service) CreatePendingInvoiceLines(ctx context.Context, input billing.CreatePendingInvoiceLinesInput) (*billing.CreatePendingInvoiceLinesResult, error) {
 	for i := range input.Lines {
 		input.Lines[i].Namespace = input.Customer.Namespace
-		input.Lines[i].Status = billing.InvoiceLineStatusValid
 		input.Lines[i].Currency = input.Currency
 	}
 
@@ -59,8 +59,11 @@ func (s *Service) CreatePendingInvoiceLines(ctx context.Context, input billing.C
 	return transcationForInvoiceManipulation(ctx, s, input.Customer, func(ctx context.Context) (*billing.CreatePendingInvoiceLinesResult, error) {
 		lineServices, err := s.lineService.FromEntities(lo.Map(input.Lines, func(l *billing.Line, _ int) *billing.Line {
 			l.Namespace = input.Customer.Namespace
-			l.Status = billing.InvoiceLineStatusValid
 			l.Currency = input.Currency
+
+			// This is only used to ensure that we know the line IDs before the upsert so that we can return
+			// the correct lines to the caller.
+			l.ID = ulid.Make().String()
 
 			return l
 		}))
@@ -112,45 +115,33 @@ func (s *Service) CreatePendingInvoiceLines(ctx context.Context, input billing.C
 			lines = append(lines, lineSvc)
 		}
 
-		// Create the invoice Lines
-		createdLines, err := s.adapter.UpsertInvoiceLines(ctx, billing.UpsertInvoiceLinesAdapterInput{
-			Namespace: input.Customer.Namespace,
-			Lines:     lines.ToEntities(),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("creating invoice Line: %w", err)
-		}
+		linesToCreate := lines.ToEntities()
 
-		// Let's reload the invoice after the lines has been assigned
-		gatheringInvoice, err = s.GetInvoiceByID(ctx, billing.GetInvoiceByIdInput{
-			Invoice: gatheringInvoice.InvoiceID(),
-			Expand:  billing.InvoiceExpandAll,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("fetching invoice[%s]: %w", gatheringInvoice.ID, err)
-		}
+		gatheringInvoice.Lines.Append(linesToCreate...)
+
+		gatheringInvoiceID := gatheringInvoice.ID
 
 		if err := s.invoiceCalculator.CalculateGatheringInvoice(&gatheringInvoice); err != nil {
-			return nil, fmt.Errorf("calculating invoice[%s]: %w", gatheringInvoice.ID, err)
+			return nil, fmt.Errorf("calculating invoice[%s]: %w", gatheringInvoiceID, err)
 		}
 
 		gatheringInvoice, err = s.adapter.UpdateInvoice(ctx, gatheringInvoice)
 		if err != nil {
-			return nil, fmt.Errorf("failed to update invoice[%s]: %w", gatheringInvoice.ID, err)
+			return nil, fmt.Errorf("failed to update invoice[%s]: %w", gatheringInvoiceID, err)
 		}
 
 		gatheringInvoice, err = s.resolveWorkflowApps(ctx, gatheringInvoice)
 		if err != nil {
-			return nil, fmt.Errorf("error resolving workflow apps for invoice [%s]: %w", gatheringInvoice.ID, err)
+			return nil, fmt.Errorf("error resolving workflow apps for invoice [%s]: %w", gatheringInvoiceID, err)
 		}
 
 		// Let's resolve the created lines from the final invoice
-		invoiceLinesByID, _ := slicesx.UniqueGroupBy(gatheringInvoice.Lines.OrEmpty(), func(l *billing.Line) string {
-			return l.ID
+		invoiceLinesByID := lo.SliceToMap(gatheringInvoice.Lines.OrEmpty(), func(l *billing.Line) (string, *billing.Line) {
+			return l.ID, l
 		})
 
 		finalLines := []*billing.Line{}
-		for _, line := range createdLines {
+		for _, line := range linesToCreate {
 			if line, ok := invoiceLinesByID[line.ID]; ok {
 				finalLines = append(finalLines, line)
 			}
@@ -164,7 +155,7 @@ func (s *Service) CreatePendingInvoiceLines(ctx context.Context, input billing.C
 			}
 
 			if err := s.publisher.Publish(ctx, event); err != nil {
-				return nil, fmt.Errorf("publishing invoice[%s] created event: %w", gatheringInvoice.ID, err)
+				return nil, fmt.Errorf("publishing invoice[%s] created event: %w", gatheringInvoiceID, err)
 			}
 		}
 
@@ -195,6 +186,9 @@ func (s *Service) upsertGatheringInvoiceForCurrency(ctx context.Context, currenc
 		OrderBy:          api.InvoiceOrderByCreatedAt,
 		Order:            sortx.OrderAsc,
 		IncludeDeleted:   true,
+		Expand: billing.InvoiceExpand{
+			Lines: true,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fetching gathering invoices: %w", err)
@@ -232,88 +226,32 @@ func (s *Service) upsertGatheringInvoiceForCurrency(ctx context.Context, currenc
 		}, nil
 	}
 
-	if len(pendingInvoiceList.Items) > 1 {
-		// Note: Given that we are not using serializable transactions (which is fine), we might
-		// have multiple gathering invoices for the same customer.
-		// This is a rare case, but we should log it at least, later we can implement a call that
-		// merges these invoices (it's fine to just move the Lines to the first invoice)
-		s.logger.WarnContext(ctx, "more than one pending invoice found", "customer", customerProfile.Customer.ID, "namespace", customerProfile.Customer.Namespace, "currency", currency)
-	}
-
 	invoice := pendingInvoiceList.Items[0]
 	if invoice.DeletedAt != nil {
 		invoice.DeletedAt = nil
 
+		// If the invoice was deleted, but has non-deleted lines, we need to delete those lines to prevent
+		// them from reappearing in the recreated gathering invoice.
+		if invoice.Lines.NonDeletedLineCount() > 0 {
+			invoice.Lines = invoice.Lines.Map(func(l *billing.Line) *billing.Line {
+				if l.DeletedAt == nil {
+					l.DeletedAt = lo.ToPtr(clock.Now())
+				}
+				return l
+			})
+		}
+
+		invoiceID := invoice.ID
+
 		invoice, err = s.adapter.UpdateInvoice(ctx, invoice)
 		if err != nil {
-			return nil, fmt.Errorf("restoring deleted invoice[id=%s]: %w", invoice.ID, err)
+			return nil, fmt.Errorf("restoring deleted invoice[id=%s]: %w", invoiceID, err)
 		}
 	}
 
 	return &upsertGatheringInvoiceForCurrencyResponse{
 		Invoice: &invoice,
 	}, nil
-}
-
-func (s *Service) associateLinesToInvoice(ctx context.Context, invoice billing.Invoice, lines []lineservice.LineWithBillablePeriod) (billing.Invoice, error) {
-	for _, line := range lines {
-		if line.InvoiceID() == invoice.ID {
-			return invoice, billing.ValidationError{
-				Err: fmt.Errorf("line[%s]: line already associated with invoice[%s]", line.ID(), invoice.ID),
-			}
-		}
-	}
-
-	invoiceLines := make(lineservice.Lines, 0, len(lines))
-	// Let's do the line splitting if needed
-	for _, line := range lines {
-		if !line.Period().Equal(line.BillablePeriod) {
-			// We need to split the line into multiple lines
-			if !line.Period().Start.Equal(line.BillablePeriod.Start) {
-				return invoice, fmt.Errorf("line[%s]: line period start[%s] is not equal to billable period start[%s]", line.ID(), line.Period().Start, line.BillablePeriod.Start)
-			}
-
-			splitLine, err := line.Split(ctx, line.BillablePeriod.End)
-			if err != nil {
-				return invoice, fmt.Errorf("line[%s]: splitting line: %w", line.ID(), err)
-			}
-
-			if splitLine.PreSplitAtLine == nil {
-				s.logger.WarnContext(ctx, "pre split line is nil, we are not creating empty lines", "line", line.ID(), "period_start", line.Period().Start, "period_end", line.Period().End, "period_end", line.Period().End)
-			}
-
-			invoiceLines = append(invoiceLines, splitLine.PreSplitAtLine)
-		} else {
-			invoiceLines = append(invoiceLines, line)
-		}
-	}
-
-	// Validate that the line can be associated with the invoice
-	var validationErrors error
-	for _, line := range invoiceLines {
-		if err := line.Validate(ctx, &invoice); err != nil {
-			validationErrors = fmt.Errorf("line[%s]: %w", line.ID(), err)
-		}
-	}
-	if validationErrors != nil {
-		return invoice, validationErrors
-	}
-
-	// Associate the lines to the invoice
-	invoiceLines, err := s.lineService.AssociateLinesToInvoice(ctx, &invoice, invoiceLines)
-	if err != nil {
-		return invoice, fmt.Errorf("associating lines to invoice: %w", err)
-	}
-
-	// Let's create the sub lines as per the meters (we are not setting the QuantitySnapshotedAt field just now, to signal that this is not the final snapshot)
-	if err := s.snapshotLineQuantitiesInParallel(ctx, invoice.Customer, invoiceLines); err != nil {
-		return invoice, fmt.Errorf("snapshotting lines: %w", err)
-	}
-
-	// Let's active the invoice state machine so that calculations can be done
-	return s.WithInvoiceStateMachine(ctx, invoice, func(ctx context.Context, ism *InvoiceStateMachine) error {
-		return ism.StateMachine.ActivateCtx(ctx)
-	})
 }
 
 func (s *Service) snapshotLineQuantitiesInParallel(ctx context.Context, customer billing.InvoiceCustomer, lines lineservice.Lines) error {

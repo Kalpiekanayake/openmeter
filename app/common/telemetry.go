@@ -19,7 +19,6 @@ import (
 	realotelslog "go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
@@ -86,28 +85,16 @@ const (
 	DefaultShutdownTimeout = 5 * time.Second
 )
 
-func NewTelemetryResource(metadata Metadata, cfg config.TelemetryConfig) *resource.Resource {
-	var attributes resource.Option
-
-	switch cfg.AttributeSchema {
-	case config.AttributeSchemaTypeDatadog:
-		attributes = resource.WithAttributes(
-			attribute.String("service", metadata.ServiceName),
-			attribute.String("service_version", metadata.Version),
-			semconv.DeploymentEnvironmentName(metadata.Environment),
-		)
-	default:
-		attributes = resource.WithAttributes(
-			semconv.ServiceName(metadata.ServiceName),
-			semconv.ServiceVersion(metadata.Version),
-			semconv.DeploymentEnvironmentName(metadata.Environment),
-		)
-	}
+func NewTelemetryResource(metadata Metadata) *resource.Resource {
 	extraResources, _ := resource.New(
 		// TODO: use the globally available context here?
 		context.Background(),
 		resource.WithContainer(),
-		attributes,
+		resource.WithAttributes(
+			semconv.ServiceName(metadata.ServiceName),
+			semconv.ServiceVersion(metadata.Version),
+			semconv.DeploymentEnvironmentName(metadata.Environment),
+		),
 	)
 
 	res, _ := resource.Merge(
@@ -142,13 +129,17 @@ func NewLoggerProvider(ctx context.Context, conf config.LogTelemetryConfig, res 
 	}, nil
 }
 
-func NewLogger(conf config.LogTelemetryConfig, res *resource.Resource, loggerProvider log.LoggerProvider, metadata Metadata) *slog.Logger {
+func NewLogger(conf config.LogTelemetryConfig, res *resource.Resource, loggerProvider log.LoggerProvider, metadata Metadata, additionalMiddlewares []slogmulti.Middleware) *slog.Logger {
+	baseMiddlewares := []slogmulti.Middleware{
+		otelslog.ResourceMiddleware(res),
+		otelslog.NewHandler,
+	}
+
+	baseMiddlewares = append(baseMiddlewares, additionalMiddlewares...)
+
 	// Stdout logger
 	stdoutLogger := slogmulti.
-		Pipe(
-			otelslog.ResourceMiddleware(res),
-			otelslog.NewHandler,
-		).
+		Pipe(baseMiddlewares...).
 		Handler(conf.NewHandler(os.Stdout))
 
 	// OTel logger
@@ -170,6 +161,10 @@ func NewLogger(conf config.LogTelemetryConfig, res *resource.Resource, loggerPro
 	)
 
 	return slog.New(middlewares.Handler(out))
+}
+
+func TelemetryLoggerNoAdditionalMiddlewares() []slogmulti.Middleware {
+	return nil
 }
 
 func NewMeterProvider(ctx context.Context, conf config.MetricsTelemetryConfig, res *resource.Resource, logger *slog.Logger) (*sdkmetric.MeterProvider, func(), error) {
@@ -272,7 +267,7 @@ func NewTelemetryServer(conf config.TelemetryConfig, handler TelemetryHandler) (
 	return server, func() { server.Close() }
 }
 
-type TelemetryMiddlewareHook = server.MiddlewareHook
+type TelemetryMiddlewareHook server.MiddlewareHook
 
 func NewTelemetryRouterHook(meterProvider metric.MeterProvider, tracerProvider trace.TracerProvider) TelemetryMiddlewareHook {
 	return func(m server.MiddlewareManager) {

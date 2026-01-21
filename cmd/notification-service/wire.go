@@ -58,7 +58,9 @@ func initializeApplication(ctx context.Context, conf config.Configuration) (Appl
 		common.NotificationServiceProvisionTopics,
 		common.ProgressManager,
 		common.Streaming,
+		common.NewSvixAPIClient,
 		common.Telemetry,
+		common.TelemetryLoggerNoAdditionalMiddlewares,
 		common.Watermill,
 		wire.Struct(new(Application), "*"),
 	)

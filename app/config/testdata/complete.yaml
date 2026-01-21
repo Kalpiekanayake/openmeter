@@ -63,6 +63,9 @@ aggregation:
     password: default
     database: openmeter
 
+    retry:
+      enabled: true
+
 sink:
   groupId: openmeter-sink-worker
   minCommitCount: 500
@@ -139,10 +142,23 @@ meters:
       method: $.method
       path: $.path
 
+reservedEventTypes:
+  - ^reserved\..*$
+  - ^_\..*$
+  - ^openmeter\..*$
+
 notification:
   enabled: true
+  reconcileInterval: 1m
+  sendingTimeout: 1h
+  pendingTimeout: 2h
 
 svix:
   apiKey: test-svix-token
   serverURL: http://127.0.0.1:8071
   debug: true
+
+productCatalog:
+  subscription:
+    multiSubscriptionNamespaces:
+      - "multi-subscription"

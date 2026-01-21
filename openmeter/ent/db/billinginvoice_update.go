@@ -16,6 +16,7 @@ import (
 	"github.com/openmeterio/openmeter/openmeter/ent/db/billinginvoice"
 	"github.com/openmeterio/openmeter/openmeter/ent/db/billinginvoiceline"
 	"github.com/openmeterio/openmeter/openmeter/ent/db/billinginvoicevalidationissue"
+	"github.com/openmeterio/openmeter/openmeter/ent/db/billingstandardinvoicedetailedline"
 	"github.com/openmeterio/openmeter/openmeter/ent/db/billingworkflowconfig"
 	"github.com/openmeterio/openmeter/openmeter/ent/db/predicate"
 	"github.com/openmeterio/openmeter/pkg/models"
@@ -524,6 +525,12 @@ func (_u *BillingInvoiceUpdate) SetCustomerUsageAttribution(v *billing.Versioned
 	return _u
 }
 
+// ClearCustomerUsageAttribution clears the value of the "customer_usage_attribution" field.
+func (_u *BillingInvoiceUpdate) ClearCustomerUsageAttribution() *BillingInvoiceUpdate {
+	_u.mutation.ClearCustomerUsageAttribution()
+	return _u
+}
+
 // SetNumber sets the "number" field.
 func (_u *BillingInvoiceUpdate) SetNumber(v string) *BillingInvoiceUpdate {
 	_u.mutation.SetNumber(v)
@@ -860,6 +867,47 @@ func (_u *BillingInvoiceUpdate) ClearCollectionAt() *BillingInvoiceUpdate {
 	return _u
 }
 
+// SetPaymentProcessingEnteredAt sets the "payment_processing_entered_at" field.
+func (_u *BillingInvoiceUpdate) SetPaymentProcessingEnteredAt(v time.Time) *BillingInvoiceUpdate {
+	_u.mutation.SetPaymentProcessingEnteredAt(v)
+	return _u
+}
+
+// SetNillablePaymentProcessingEnteredAt sets the "payment_processing_entered_at" field if the given value is not nil.
+func (_u *BillingInvoiceUpdate) SetNillablePaymentProcessingEnteredAt(v *time.Time) *BillingInvoiceUpdate {
+	if v != nil {
+		_u.SetPaymentProcessingEnteredAt(*v)
+	}
+	return _u
+}
+
+// ClearPaymentProcessingEnteredAt clears the value of the "payment_processing_entered_at" field.
+func (_u *BillingInvoiceUpdate) ClearPaymentProcessingEnteredAt() *BillingInvoiceUpdate {
+	_u.mutation.ClearPaymentProcessingEnteredAt()
+	return _u
+}
+
+// SetSchemaLevel sets the "schema_level" field.
+func (_u *BillingInvoiceUpdate) SetSchemaLevel(v int) *BillingInvoiceUpdate {
+	_u.mutation.ResetSchemaLevel()
+	_u.mutation.SetSchemaLevel(v)
+	return _u
+}
+
+// SetNillableSchemaLevel sets the "schema_level" field if the given value is not nil.
+func (_u *BillingInvoiceUpdate) SetNillableSchemaLevel(v *int) *BillingInvoiceUpdate {
+	if v != nil {
+		_u.SetSchemaLevel(*v)
+	}
+	return _u
+}
+
+// AddSchemaLevel adds value to the "schema_level" field.
+func (_u *BillingInvoiceUpdate) AddSchemaLevel(v int) *BillingInvoiceUpdate {
+	_u.mutation.AddSchemaLevel(v)
+	return _u
+}
+
 // SetBillingWorkflowConfigID sets the "billing_workflow_config" edge to the BillingWorkflowConfig entity by ID.
 func (_u *BillingInvoiceUpdate) SetBillingWorkflowConfigID(id string) *BillingInvoiceUpdate {
 	_u.mutation.SetBillingWorkflowConfigID(id)
@@ -884,6 +932,21 @@ func (_u *BillingInvoiceUpdate) AddBillingInvoiceLines(v ...*BillingInvoiceLine)
 		ids[i] = v[i].ID
 	}
 	return _u.AddBillingInvoiceLineIDs(ids...)
+}
+
+// AddBillingInvoiceDetailedLineIDs adds the "billing_invoice_detailed_lines" edge to the BillingStandardInvoiceDetailedLine entity by IDs.
+func (_u *BillingInvoiceUpdate) AddBillingInvoiceDetailedLineIDs(ids ...string) *BillingInvoiceUpdate {
+	_u.mutation.AddBillingInvoiceDetailedLineIDs(ids...)
+	return _u
+}
+
+// AddBillingInvoiceDetailedLines adds the "billing_invoice_detailed_lines" edges to the BillingStandardInvoiceDetailedLine entity.
+func (_u *BillingInvoiceUpdate) AddBillingInvoiceDetailedLines(v ...*BillingStandardInvoiceDetailedLine) *BillingInvoiceUpdate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddBillingInvoiceDetailedLineIDs(ids...)
 }
 
 // AddBillingInvoiceValidationIssueIDs adds the "billing_invoice_validation_issues" edge to the BillingInvoiceValidationIssue entity by IDs.
@@ -931,6 +994,27 @@ func (_u *BillingInvoiceUpdate) RemoveBillingInvoiceLines(v ...*BillingInvoiceLi
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveBillingInvoiceLineIDs(ids...)
+}
+
+// ClearBillingInvoiceDetailedLines clears all "billing_invoice_detailed_lines" edges to the BillingStandardInvoiceDetailedLine entity.
+func (_u *BillingInvoiceUpdate) ClearBillingInvoiceDetailedLines() *BillingInvoiceUpdate {
+	_u.mutation.ClearBillingInvoiceDetailedLines()
+	return _u
+}
+
+// RemoveBillingInvoiceDetailedLineIDs removes the "billing_invoice_detailed_lines" edge to BillingStandardInvoiceDetailedLine entities by IDs.
+func (_u *BillingInvoiceUpdate) RemoveBillingInvoiceDetailedLineIDs(ids ...string) *BillingInvoiceUpdate {
+	_u.mutation.RemoveBillingInvoiceDetailedLineIDs(ids...)
+	return _u
+}
+
+// RemoveBillingInvoiceDetailedLines removes "billing_invoice_detailed_lines" edges to BillingStandardInvoiceDetailedLine entities.
+func (_u *BillingInvoiceUpdate) RemoveBillingInvoiceDetailedLines(v ...*BillingStandardInvoiceDetailedLine) *BillingInvoiceUpdate {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveBillingInvoiceDetailedLineIDs(ids...)
 }
 
 // ClearBillingInvoiceValidationIssues clears all "billing_invoice_validation_issues" edges to the BillingInvoiceValidationIssue entity.
@@ -1010,6 +1094,11 @@ func (_u *BillingInvoiceUpdate) check() error {
 	if v, ok := _u.mutation.CustomerName(); ok {
 		if err := billinginvoice.CustomerNameValidator(v); err != nil {
 			return &ValidationError{Name: "customer_name", err: fmt.Errorf(`db: validator failed for field "BillingInvoice.customer_name": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CustomerUsageAttribution(); ok {
+		if err := v.Validate(); err != nil {
+			return &ValidationError{Name: "customer_usage_attribution", err: fmt.Errorf(`db: validator failed for field "BillingInvoice.customer_usage_attribution": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.GetType(); ok {
@@ -1196,6 +1285,9 @@ func (_u *BillingInvoiceUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.CustomerUsageAttribution(); ok {
 		_spec.SetField(billinginvoice.FieldCustomerUsageAttribution, field.TypeJSON, value)
 	}
+	if _u.mutation.CustomerUsageAttributionCleared() {
+		_spec.ClearField(billinginvoice.FieldCustomerUsageAttribution, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.Number(); ok {
 		_spec.SetField(billinginvoice.FieldNumber, field.TypeString, value)
 	}
@@ -1289,6 +1381,18 @@ func (_u *BillingInvoiceUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if _u.mutation.CollectionAtCleared() {
 		_spec.ClearField(billinginvoice.FieldCollectionAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.PaymentProcessingEnteredAt(); ok {
+		_spec.SetField(billinginvoice.FieldPaymentProcessingEnteredAt, field.TypeTime, value)
+	}
+	if _u.mutation.PaymentProcessingEnteredAtCleared() {
+		_spec.ClearField(billinginvoice.FieldPaymentProcessingEnteredAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SchemaLevel(); ok {
+		_spec.SetField(billinginvoice.FieldSchemaLevel, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSchemaLevel(); ok {
+		_spec.AddField(billinginvoice.FieldSchemaLevel, field.TypeInt, value)
+	}
 	if _u.mutation.BillingWorkflowConfigCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2O,
@@ -1356,6 +1460,51 @@ func (_u *BillingInvoiceUpdate) sqlSave(ctx context.Context) (_node int, err err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(billinginvoiceline.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.BillingInvoiceDetailedLinesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   billinginvoice.BillingInvoiceDetailedLinesTable,
+			Columns: []string{billinginvoice.BillingInvoiceDetailedLinesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingstandardinvoicedetailedline.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedBillingInvoiceDetailedLinesIDs(); len(nodes) > 0 && !_u.mutation.BillingInvoiceDetailedLinesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   billinginvoice.BillingInvoiceDetailedLinesTable,
+			Columns: []string{billinginvoice.BillingInvoiceDetailedLinesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingstandardinvoicedetailedline.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.BillingInvoiceDetailedLinesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   billinginvoice.BillingInvoiceDetailedLinesTable,
+			Columns: []string{billinginvoice.BillingInvoiceDetailedLinesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingstandardinvoicedetailedline.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {
@@ -1918,6 +2067,12 @@ func (_u *BillingInvoiceUpdateOne) SetCustomerUsageAttribution(v *billing.Versio
 	return _u
 }
 
+// ClearCustomerUsageAttribution clears the value of the "customer_usage_attribution" field.
+func (_u *BillingInvoiceUpdateOne) ClearCustomerUsageAttribution() *BillingInvoiceUpdateOne {
+	_u.mutation.ClearCustomerUsageAttribution()
+	return _u
+}
+
 // SetNumber sets the "number" field.
 func (_u *BillingInvoiceUpdateOne) SetNumber(v string) *BillingInvoiceUpdateOne {
 	_u.mutation.SetNumber(v)
@@ -2254,6 +2409,47 @@ func (_u *BillingInvoiceUpdateOne) ClearCollectionAt() *BillingInvoiceUpdateOne 
 	return _u
 }
 
+// SetPaymentProcessingEnteredAt sets the "payment_processing_entered_at" field.
+func (_u *BillingInvoiceUpdateOne) SetPaymentProcessingEnteredAt(v time.Time) *BillingInvoiceUpdateOne {
+	_u.mutation.SetPaymentProcessingEnteredAt(v)
+	return _u
+}
+
+// SetNillablePaymentProcessingEnteredAt sets the "payment_processing_entered_at" field if the given value is not nil.
+func (_u *BillingInvoiceUpdateOne) SetNillablePaymentProcessingEnteredAt(v *time.Time) *BillingInvoiceUpdateOne {
+	if v != nil {
+		_u.SetPaymentProcessingEnteredAt(*v)
+	}
+	return _u
+}
+
+// ClearPaymentProcessingEnteredAt clears the value of the "payment_processing_entered_at" field.
+func (_u *BillingInvoiceUpdateOne) ClearPaymentProcessingEnteredAt() *BillingInvoiceUpdateOne {
+	_u.mutation.ClearPaymentProcessingEnteredAt()
+	return _u
+}
+
+// SetSchemaLevel sets the "schema_level" field.
+func (_u *BillingInvoiceUpdateOne) SetSchemaLevel(v int) *BillingInvoiceUpdateOne {
+	_u.mutation.ResetSchemaLevel()
+	_u.mutation.SetSchemaLevel(v)
+	return _u
+}
+
+// SetNillableSchemaLevel sets the "schema_level" field if the given value is not nil.
+func (_u *BillingInvoiceUpdateOne) SetNillableSchemaLevel(v *int) *BillingInvoiceUpdateOne {
+	if v != nil {
+		_u.SetSchemaLevel(*v)
+	}
+	return _u
+}
+
+// AddSchemaLevel adds value to the "schema_level" field.
+func (_u *BillingInvoiceUpdateOne) AddSchemaLevel(v int) *BillingInvoiceUpdateOne {
+	_u.mutation.AddSchemaLevel(v)
+	return _u
+}
+
 // SetBillingWorkflowConfigID sets the "billing_workflow_config" edge to the BillingWorkflowConfig entity by ID.
 func (_u *BillingInvoiceUpdateOne) SetBillingWorkflowConfigID(id string) *BillingInvoiceUpdateOne {
 	_u.mutation.SetBillingWorkflowConfigID(id)
@@ -2278,6 +2474,21 @@ func (_u *BillingInvoiceUpdateOne) AddBillingInvoiceLines(v ...*BillingInvoiceLi
 		ids[i] = v[i].ID
 	}
 	return _u.AddBillingInvoiceLineIDs(ids...)
+}
+
+// AddBillingInvoiceDetailedLineIDs adds the "billing_invoice_detailed_lines" edge to the BillingStandardInvoiceDetailedLine entity by IDs.
+func (_u *BillingInvoiceUpdateOne) AddBillingInvoiceDetailedLineIDs(ids ...string) *BillingInvoiceUpdateOne {
+	_u.mutation.AddBillingInvoiceDetailedLineIDs(ids...)
+	return _u
+}
+
+// AddBillingInvoiceDetailedLines adds the "billing_invoice_detailed_lines" edges to the BillingStandardInvoiceDetailedLine entity.
+func (_u *BillingInvoiceUpdateOne) AddBillingInvoiceDetailedLines(v ...*BillingStandardInvoiceDetailedLine) *BillingInvoiceUpdateOne {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddBillingInvoiceDetailedLineIDs(ids...)
 }
 
 // AddBillingInvoiceValidationIssueIDs adds the "billing_invoice_validation_issues" edge to the BillingInvoiceValidationIssue entity by IDs.
@@ -2325,6 +2536,27 @@ func (_u *BillingInvoiceUpdateOne) RemoveBillingInvoiceLines(v ...*BillingInvoic
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveBillingInvoiceLineIDs(ids...)
+}
+
+// ClearBillingInvoiceDetailedLines clears all "billing_invoice_detailed_lines" edges to the BillingStandardInvoiceDetailedLine entity.
+func (_u *BillingInvoiceUpdateOne) ClearBillingInvoiceDetailedLines() *BillingInvoiceUpdateOne {
+	_u.mutation.ClearBillingInvoiceDetailedLines()
+	return _u
+}
+
+// RemoveBillingInvoiceDetailedLineIDs removes the "billing_invoice_detailed_lines" edge to BillingStandardInvoiceDetailedLine entities by IDs.
+func (_u *BillingInvoiceUpdateOne) RemoveBillingInvoiceDetailedLineIDs(ids ...string) *BillingInvoiceUpdateOne {
+	_u.mutation.RemoveBillingInvoiceDetailedLineIDs(ids...)
+	return _u
+}
+
+// RemoveBillingInvoiceDetailedLines removes "billing_invoice_detailed_lines" edges to BillingStandardInvoiceDetailedLine entities.
+func (_u *BillingInvoiceUpdateOne) RemoveBillingInvoiceDetailedLines(v ...*BillingStandardInvoiceDetailedLine) *BillingInvoiceUpdateOne {
+	ids := make([]string, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveBillingInvoiceDetailedLineIDs(ids...)
 }
 
 // ClearBillingInvoiceValidationIssues clears all "billing_invoice_validation_issues" edges to the BillingInvoiceValidationIssue entity.
@@ -2417,6 +2649,11 @@ func (_u *BillingInvoiceUpdateOne) check() error {
 	if v, ok := _u.mutation.CustomerName(); ok {
 		if err := billinginvoice.CustomerNameValidator(v); err != nil {
 			return &ValidationError{Name: "customer_name", err: fmt.Errorf(`db: validator failed for field "BillingInvoice.customer_name": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CustomerUsageAttribution(); ok {
+		if err := v.Validate(); err != nil {
+			return &ValidationError{Name: "customer_usage_attribution", err: fmt.Errorf(`db: validator failed for field "BillingInvoice.customer_usage_attribution": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.GetType(); ok {
@@ -2620,6 +2857,9 @@ func (_u *BillingInvoiceUpdateOne) sqlSave(ctx context.Context) (_node *BillingI
 	if value, ok := _u.mutation.CustomerUsageAttribution(); ok {
 		_spec.SetField(billinginvoice.FieldCustomerUsageAttribution, field.TypeJSON, value)
 	}
+	if _u.mutation.CustomerUsageAttributionCleared() {
+		_spec.ClearField(billinginvoice.FieldCustomerUsageAttribution, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.Number(); ok {
 		_spec.SetField(billinginvoice.FieldNumber, field.TypeString, value)
 	}
@@ -2713,6 +2953,18 @@ func (_u *BillingInvoiceUpdateOne) sqlSave(ctx context.Context) (_node *BillingI
 	if _u.mutation.CollectionAtCleared() {
 		_spec.ClearField(billinginvoice.FieldCollectionAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.PaymentProcessingEnteredAt(); ok {
+		_spec.SetField(billinginvoice.FieldPaymentProcessingEnteredAt, field.TypeTime, value)
+	}
+	if _u.mutation.PaymentProcessingEnteredAtCleared() {
+		_spec.ClearField(billinginvoice.FieldPaymentProcessingEnteredAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SchemaLevel(); ok {
+		_spec.SetField(billinginvoice.FieldSchemaLevel, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSchemaLevel(); ok {
+		_spec.AddField(billinginvoice.FieldSchemaLevel, field.TypeInt, value)
+	}
 	if _u.mutation.BillingWorkflowConfigCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2O,
@@ -2780,6 +3032,51 @@ func (_u *BillingInvoiceUpdateOne) sqlSave(ctx context.Context) (_node *BillingI
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(billinginvoiceline.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.BillingInvoiceDetailedLinesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   billinginvoice.BillingInvoiceDetailedLinesTable,
+			Columns: []string{billinginvoice.BillingInvoiceDetailedLinesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingstandardinvoicedetailedline.FieldID, field.TypeString),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedBillingInvoiceDetailedLinesIDs(); len(nodes) > 0 && !_u.mutation.BillingInvoiceDetailedLinesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   billinginvoice.BillingInvoiceDetailedLinesTable,
+			Columns: []string{billinginvoice.BillingInvoiceDetailedLinesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingstandardinvoicedetailedline.FieldID, field.TypeString),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.BillingInvoiceDetailedLinesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   billinginvoice.BillingInvoiceDetailedLinesTable,
+			Columns: []string{billinginvoice.BillingInvoiceDetailedLinesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(billingstandardinvoicedetailedline.FieldID, field.TypeString),
 			},
 		}
 		for _, k := range nodes {

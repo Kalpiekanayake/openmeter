@@ -28,6 +28,14 @@ type AggregationConfiguration struct {
 	// For example, you can set the `max_insert_threads` setting to control the number of threads
 	// or the `parallel_view_processing` setting to enable pushing to attached views concurrently.
 	InsertQuerySettings map[string]string
+
+	// MeterQuerySettings is the settings for the meter query
+	// For example, you can set the `enable_parallel_replicas` and `max_parallel_replicas` settings.
+	// See https://clickhouse.com/docs/en/operations/settings/settings
+	MeterQuerySettings map[string]string
+
+	// EnablePrewhere is the setting to enable prewhere for the meter query.
+	EnablePrewhere bool
 }
 
 // Validate validates the configuration.
@@ -62,7 +70,10 @@ type ClickHouseAggregationConfiguration struct {
 	ConnMaxLifetime time.Duration
 	BlockBufferSize uint8
 
-	Tracing bool
+	Tracing     bool
+	PoolMetrics ClickhousePoolMetricsConfig
+
+	Retry ClickhouseQueryRetryConfig
 }
 
 // Validate validates the configuration.
@@ -93,6 +104,14 @@ func (c ClickHouseAggregationConfiguration) Validate() error {
 		errs = append(errs, errors.New("block buffer size must be greater than 0"))
 	}
 
+	if err := c.Retry.Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("retry: %w", err))
+	}
+
+	if err := c.PoolMetrics.Validate(); err != nil {
+		errs = append(errs, fmt.Errorf("pool metrics: %w", err))
+	}
+
 	return errors.Join(errs...)
 }
 
@@ -114,10 +133,55 @@ func (c ClickHouseAggregationConfiguration) GetClientOptions() *clickhouse.Optio
 	// This minimal TLS.Config is normally sufficient to connect to the secure native port (normally 9440) on a ClickHouse server.
 	// See: https://clickhouse.com/docs/en/integrations/go#using-tls
 	if c.TLS {
-		options.TLS = &tls.Config{}
+		options.TLS = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+		}
 	}
 
 	return options
+}
+
+type ClickhouseQueryRetryConfig struct {
+	Enabled           bool
+	MaxTries          int
+	RetryWaitDuration time.Duration
+}
+
+func (c ClickhouseQueryRetryConfig) Validate() error {
+	var errs []error
+
+	if !c.Enabled {
+		return nil
+	}
+
+	if c.MaxTries <= 1 {
+		errs = append(errs, errors.New("max retries must be greater than or equal to 1"))
+	}
+
+	if c.RetryWaitDuration <= 0 {
+		errs = append(errs, errors.New("retry wait duration must be greater than 0"))
+	}
+
+	return errors.Join(errs...)
+}
+
+type ClickhousePoolMetricsConfig struct {
+	Enabled      bool
+	PollInterval time.Duration
+}
+
+func (c ClickhousePoolMetricsConfig) Validate() error {
+	var errs []error
+
+	if !c.Enabled {
+		return nil
+	}
+
+	if c.PollInterval <= 0 {
+		errs = append(errs, errors.New("poll interval must be greater than 0"))
+	}
+
+	return errors.Join(errs...)
 }
 
 // ConfigureAggregation configures some defaults in the Viper instance.
@@ -138,4 +202,13 @@ func ConfigureAggregation(v *viper.Viper) {
 	v.SetDefault("aggregation.clickhouse.maxIdleConns", 5)
 	v.SetDefault("aggregation.clickhouse.connMaxLifetime", "10m")
 	v.SetDefault("aggregation.clickhouse.blockBufferSize", 10)
+
+	// Retry
+	v.SetDefault("aggregation.clickhouse.retry.enabled", false)
+	v.SetDefault("aggregation.clickhouse.retry.maxTries", 3)
+	v.SetDefault("aggregation.clickhouse.retry.retryWaitDuration", "20ms")
+
+	// Pool metrics
+	v.SetDefault("aggregation.clickhouse.poolMetrics.enabled", true)
+	v.SetDefault("aggregation.clickhouse.poolMetrics.pollInterval", "5s")
 }

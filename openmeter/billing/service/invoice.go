@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
-	"time"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/samber/lo"
@@ -16,7 +14,6 @@ import (
 	"github.com/openmeterio/openmeter/openmeter/billing/service/lineservice"
 	"github.com/openmeterio/openmeter/openmeter/customer"
 	"github.com/openmeterio/openmeter/pkg/clock"
-	"github.com/openmeterio/openmeter/pkg/currencyx"
 	"github.com/openmeterio/openmeter/pkg/framework/transaction"
 )
 
@@ -29,14 +26,16 @@ func (s *Service) ListInvoices(ctx context.Context, input billing.ListInvoicesIn
 	}
 
 	for i := range invoices.Items {
+		invoiceID := invoices.Items[i].ID
+
 		invoices.Items[i], err = s.resolveWorkflowApps(ctx, invoices.Items[i])
 		if err != nil {
-			return billing.ListInvoicesResponse{}, fmt.Errorf("error resolving workflow apps [%s]: %w", invoices.Items[i].ID, err)
+			return billing.ListInvoicesResponse{}, fmt.Errorf("error resolving workflow apps [%s]: %w", invoiceID, err)
 		}
 
 		invoices.Items[i], err = s.resolveStatusDetails(ctx, invoices.Items[i])
 		if err != nil {
-			return billing.ListInvoicesResponse{}, fmt.Errorf("error resolving status details for invoice [%s]: %w", invoices.Items[i].ID, err)
+			return billing.ListInvoicesResponse{}, fmt.Errorf("error resolving status details for invoice [%s]: %w", invoiceID, err)
 		}
 
 		if input.Expand.RecalculateGatheringInvoice {
@@ -45,7 +44,7 @@ func (s *Service) ListInvoices(ctx context.Context, input billing.ListInvoicesIn
 				Expand:  input.Expand,
 			})
 			if err != nil {
-				return billing.ListInvoicesResponse{}, fmt.Errorf("error recalculating gathering invoice [%s]: %w", invoices.Items[i].ID, err)
+				return billing.ListInvoicesResponse{}, fmt.Errorf("error recalculating gathering invoice [%s]: %w", invoiceID, err)
 			}
 		}
 	}
@@ -153,7 +152,7 @@ func (s *Service) recalculateGatheringInvoice(ctx context.Context, in recalculat
 
 	inScopeLineSvcs, err := s.lineService.FromEntities(
 		lo.Filter(invoice.Lines.OrEmpty(), func(line *billing.Line, _ int) bool {
-			return line.Status == billing.InvoiceLineStatusValid && line.DeletedAt == nil
+			return line.DeletedAt == nil
 		}),
 	)
 	if err != nil {
@@ -219,6 +218,8 @@ func (s *Service) recalculateGatheringInvoice(ctx context.Context, in recalculat
 }
 
 func (s *Service) GetInvoiceByID(ctx context.Context, input billing.GetInvoiceByIdInput) (billing.Invoice, error) {
+	invoiceID := input.Invoice.ID
+
 	invoice, err := s.adapter.GetInvoiceById(ctx, input)
 	if err != nil {
 		return billing.Invoice{}, err
@@ -226,12 +227,12 @@ func (s *Service) GetInvoiceByID(ctx context.Context, input billing.GetInvoiceBy
 
 	invoice, err = s.resolveWorkflowApps(ctx, invoice)
 	if err != nil {
-		return billing.Invoice{}, fmt.Errorf("error resolving workload apps for invoice [%s]: %w", invoice.ID, err)
+		return billing.Invoice{}, fmt.Errorf("error resolving workload apps for invoice [%s]: %w", invoiceID, err)
 	}
 
 	invoice, err = s.resolveStatusDetails(ctx, invoice)
 	if err != nil {
-		return billing.Invoice{}, fmt.Errorf("error resolving status details for invoice [%s]: %w", invoice.ID, err)
+		return billing.Invoice{}, fmt.Errorf("error resolving status details for invoice [%s]: %w", invoiceID, err)
 	}
 
 	if input.Expand.RecalculateGatheringInvoice {
@@ -240,270 +241,11 @@ func (s *Service) GetInvoiceByID(ctx context.Context, input billing.GetInvoiceBy
 			Expand:  input.Expand,
 		})
 		if err != nil {
-			return billing.Invoice{}, fmt.Errorf("error recalculating gathering invoice [%s]: %w", invoice.ID, err)
+			return billing.Invoice{}, fmt.Errorf("error recalculating gathering invoice [%s]: %w", invoiceID, err)
 		}
 	}
 
 	return invoice, nil
-}
-
-func (s *Service) InvoicePendingLines(ctx context.Context, input billing.InvoicePendingLinesInput) ([]billing.Invoice, error) {
-	if err := input.Validate(); err != nil {
-		return nil, billing.ValidationError{
-			Err: err,
-		}
-	}
-
-	if slices.Contains(s.fsNamespaceLockdown, input.Customer.Namespace) {
-		return nil, billing.ValidationError{
-			Err: fmt.Errorf("%w: %s", billing.ErrNamespaceLocked, input.Customer.Namespace),
-		}
-	}
-
-	return transcationForInvoiceManipulation(
-		ctx,
-		s,
-		input.Customer,
-		func(ctx context.Context) ([]billing.Invoice, error) {
-			// let's resolve the customer's settings
-			customerProfile, err := s.GetCustomerOverride(ctx, billing.GetCustomerOverrideInput{
-				Customer: input.Customer,
-				Expand: billing.CustomerOverrideExpand{
-					Customer: true,
-					Apps:     true,
-				},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("fetching customer profile: %w", err)
-			}
-
-			asof := lo.FromPtrOr(input.AsOf, clock.Now())
-
-			// let's gather the in-scope lines and validate it
-			inScopeLines, err := s.gatherInscopeLines(ctx, gatherInScopeLineInput{
-				Customer:       input.Customer,
-				LinesToInclude: input.IncludePendingLines,
-				AsOf:           asof,
-				ProgressiveBilling: lo.FromPtrOr(
-					input.ProgressiveBillingOverride,
-					customerProfile.MergedProfile.WorkflowConfig.Invoicing.ProgressiveBilling,
-				),
-			})
-			if err != nil {
-				return nil, err
-			}
-
-			sourceInvoiceIDs := lo.Uniq(lo.Map(inScopeLines, func(l lineservice.LineWithBillablePeriod, _ int) string {
-				return l.InvoiceID()
-			}))
-
-			if len(sourceInvoiceIDs) == 0 {
-				return nil, billing.ValidationError{
-					Err: fmt.Errorf("no source lines found"),
-				}
-			}
-
-			linesByCurrency := lo.GroupBy(inScopeLines, func(line lineservice.LineWithBillablePeriod) currencyx.Code {
-				return line.Currency()
-			})
-
-			createdInvoices := make([]billing.Invoice, 0, len(linesByCurrency))
-
-			for currency, lines := range linesByCurrency {
-				invoiceNumber, err := s.GenerateInvoiceSequenceNumber(ctx,
-					billing.SequenceGenerationInput{
-						Namespace:    input.Customer.Namespace,
-						CustomerName: customerProfile.MergedProfile.Name,
-						Currency:     currency,
-					},
-					billing.DraftInvoiceSequenceNumber,
-				)
-				if err != nil {
-					return nil, fmt.Errorf("generating invoice number: %w", err)
-				}
-
-				// let's create the invoice
-				invoice, err := s.adapter.CreateInvoice(ctx, billing.CreateInvoiceAdapterInput{
-					Namespace: input.Customer.Namespace,
-					Customer:  lo.FromPtr(customerProfile.Customer),
-					Profile:   customerProfile.MergedProfile,
-
-					Currency: currency,
-					Number:   invoiceNumber,
-					Status:   billing.InvoiceStatusDraftCreated,
-
-					Type: billing.InvoiceTypeStandard,
-				})
-				if err != nil {
-					return nil, fmt.Errorf("creating invoice: %w", err)
-				}
-
-				// let's resolve the workflow apps as some checks such as CanDraftSyncAdvance depends on the apps
-				invoice, err = s.resolveWorkflowApps(ctx, invoice)
-				if err != nil {
-					return nil, fmt.Errorf("error resolving workflow apps for invoice [%s]: %w", invoice.ID, err)
-				}
-
-				// let's associate the invoice lines to the invoice
-				invoice, err = s.associateLinesToInvoice(ctx, invoice, lines)
-				if err != nil {
-					return nil, fmt.Errorf("associating lines to invoice: %w", err)
-				}
-
-				// TODO[later]: we are saving here, and the state machine advancement will do a load/save later
-				// this is something we could optimize in the future by adding the option to withLockedInvoiceStateMachine
-				// to either pass in the invoice or the ID
-				savedInvoice, err := s.updateInvoice(ctx, invoice)
-				if err != nil {
-					return nil, fmt.Errorf("updating invoice[%s]: %w", invoice.ID, err)
-				}
-
-				createdInvoices = append(createdInvoices, savedInvoice)
-			}
-
-			// Let's check if we need to remove any empty gathering invoices (e.g. if they don't have any line items)
-			// This typically should happen when a subscription has ended.
-
-			invoiceLineCounts, err := s.adapter.AssociatedLineCounts(ctx, billing.AssociatedLineCountsAdapterInput{
-				Namespace:  input.Customer.Namespace,
-				InvoiceIDs: sourceInvoiceIDs,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("cleanup: line counts check: %w", err)
-			}
-
-			// Collect gathering invoices which can be deleted and which needs to have their collectionAt updated
-			// due to still having live items.
-			liveGatheringInvoiceIDs := make([]string, 0, len(sourceInvoiceIDs))
-			emptyGatheringInvoiceIDs := make([]string, 0, len(sourceInvoiceIDs))
-
-			for _, invoiceID := range sourceInvoiceIDs {
-				invoiceNamespacedID := billing.InvoiceID{
-					Namespace: input.Customer.Namespace,
-					ID:        invoiceID,
-				}
-
-				if invoiceLineCounts.Counts[invoiceNamespacedID] == 0 {
-					emptyGatheringInvoiceIDs = append(emptyGatheringInvoiceIDs, invoiceID)
-				} else {
-					liveGatheringInvoiceIDs = append(liveGatheringInvoiceIDs, invoiceID)
-				}
-			}
-
-			// Delete empty gathering invoices
-			if len(emptyGatheringInvoiceIDs) > 0 {
-				err = s.adapter.DeleteGatheringInvoices(ctx, billing.DeleteGatheringInvoicesInput{
-					Namespace:  input.Customer.Namespace,
-					InvoiceIDs: emptyGatheringInvoiceIDs,
-				})
-				if err != nil {
-					return nil, fmt.Errorf("cleanup gathering invoices: %w", err)
-				}
-			}
-
-			// Update collectionAt for live gathering invoices
-			if len(liveGatheringInvoiceIDs) > 0 {
-				resp, err := s.ListInvoices(ctx, billing.ListInvoicesInput{
-					Customers:        []string{input.Customer.ID},
-					IDs:              liveGatheringInvoiceIDs,
-					ExtendedStatuses: []billing.InvoiceStatus{billing.InvoiceStatusGathering},
-					Expand: billing.InvoiceExpand{
-						Lines: true,
-					},
-				})
-				if err != nil {
-					return nil, fmt.Errorf("failed to get gathering invoice(s) for customer [customer=%s]: %w",
-						input.Customer.ID, err,
-					)
-				}
-
-				for _, invoice := range resp.Items {
-					if err := s.invoiceCalculator.Calculate(&invoice); err != nil {
-						return nil, fmt.Errorf("failed to calculate invoice [namespace=%s invoice=%s, customer=%s]: %w",
-							input.Customer.Namespace, invoice.ID, input.Customer.ID, err,
-						)
-					}
-
-					if err = invoice.Validate(); err != nil {
-						return nil, billing.ValidationError{
-							Err: err,
-						}
-					}
-
-					if _, err = s.updateInvoice(ctx, invoice); err != nil {
-						return nil, fmt.Errorf("failed to update gathering invoice [namespace=%s invoice=%s, customer=%s]: %w",
-							input.Customer.Namespace, invoice.ID, input.Customer.ID, err,
-						)
-					}
-				}
-			}
-
-			// Assemble output: we need to refetch as the association call will have side-effects of updating
-			// invoice objects (e.g. totals, period, etc.)
-			out := make([]billing.Invoice, 0, len(createdInvoices))
-			for _, invoice := range createdInvoices {
-				// Let's check if the invoice has any validation issues due to the recalculation and make sure we are not executing the
-				// state machine on top of the failed invoice.
-				if invoice.HasCriticalValidationIssues() {
-					invoice, err := s.withLockedInvoiceStateMachine(ctx, withLockedStateMachineInput{
-						InvoiceID: invoice.InvoiceID(),
-						Callback: func(ctx context.Context, sm *InvoiceStateMachine) error {
-							return sm.TriggerFailed(ctx)
-						},
-					})
-					if err != nil {
-						return nil, fmt.Errorf("activating invoice: %w", err)
-					}
-
-					out = append(out, invoice)
-					continue
-				}
-
-				invoice, err := s.withLockedInvoiceStateMachine(ctx, withLockedStateMachineInput{
-					InvoiceID: invoice.InvoiceID(),
-					Callback: func(ctx context.Context, sm *InvoiceStateMachine) error {
-						if err := s.advanceUntilStateStable(ctx, sm); err != nil {
-							return fmt.Errorf("activating invoice: %w", err)
-						}
-
-						sm.Invoice, err = s.updateInvoice(ctx, sm.Invoice)
-						if err != nil {
-							return fmt.Errorf("updating invoice[%s]: %w", sm.Invoice.ID, err)
-						}
-
-						return nil
-					},
-				})
-				if err != nil {
-					return nil, fmt.Errorf("advancing invoice: %w", err)
-				}
-
-				out = append(out, invoice)
-			}
-
-			for _, invoice := range out {
-				event, err := billing.NewInvoiceCreatedEvent(invoice)
-				if err != nil {
-					return nil, fmt.Errorf("creating event: %w", err)
-				}
-
-				err = s.publisher.Publish(ctx, event)
-				if err != nil {
-					return nil, fmt.Errorf("publishing event: %w", err)
-				}
-			}
-
-			return out, nil
-		})
-}
-
-type gatherInScopeLineInput struct {
-	Customer customer.CustomerID
-	// If set restricts the lines to be included to these IDs, otherwise the AsOf is used
-	// to determine the lines to be included.
-	LinesToInclude     mo.Option[[]string]
-	AsOf               time.Time
-	ProgressiveBilling bool
 }
 
 func (s *Service) advanceUntilStateStable(ctx context.Context, sm *InvoiceStateMachine) error {
@@ -523,86 +265,6 @@ func (s *Service) advanceUntilStateStable(ctx context.Context, sm *InvoiceStateM
 
 	sm.Invoice.ValidationIssues = validationIssues
 	return nil
-}
-
-func (s *Service) gatherInscopeLines(ctx context.Context, in gatherInScopeLineInput) ([]lineservice.LineWithBillablePeriod, error) {
-	if in.LinesToInclude.IsPresent() {
-		lineIDs := in.LinesToInclude.OrEmpty()
-
-		if len(lineIDs) == 0 {
-			return nil, billing.ValidationError{
-				Err: billing.ErrInvoiceEmpty,
-			}
-		}
-
-		inScopeLines, err := s.adapter.ListInvoiceLines(ctx,
-			billing.ListInvoiceLinesAdapterInput{
-				Namespace:  in.Customer.Namespace,
-				CustomerID: in.Customer.ID,
-
-				LineIDs: lineIDs,
-			})
-		if err != nil {
-			return nil, fmt.Errorf("resolving in scope lines: %w", err)
-		}
-
-		lines, err := s.lineService.FromEntities(inScopeLines)
-		if err != nil {
-			return nil, fmt.Errorf("creating line services: %w", err)
-		}
-
-		// output validation
-		resolvedLines, err := lines.ResolveBillablePeriod(ctx, lineservice.ResolveBillablePeriodInput{
-			AsOf:               in.AsOf,
-			ProgressiveBilling: in.ProgressiveBilling,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		// all lines must be found
-		if len(resolvedLines) != len(lineIDs) {
-			includedLines := lo.Map(resolvedLines, func(l lineservice.LineWithBillablePeriod, _ int) string {
-				return l.ID()
-			})
-
-			missingIDs := lo.Without(lineIDs, includedLines...)
-
-			return nil, billing.NotFoundError{
-				ID:     strings.Join(missingIDs, ","),
-				Entity: billing.EntityInvoiceLine,
-				Err:    billing.ErrInvoiceLinesNotBillable,
-			}
-		}
-
-		return resolvedLines, nil
-	}
-
-	lines, err := s.adapter.ListInvoiceLines(ctx,
-		billing.ListInvoiceLinesAdapterInput{
-			Namespace:  in.Customer.Namespace,
-			CustomerID: in.Customer.ID,
-
-			InvoiceStatuses: []billing.InvoiceStatus{
-				billing.InvoiceStatusGathering,
-			},
-			Statuses: []billing.InvoiceLineStatus{
-				billing.InvoiceLineStatusValid,
-			},
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	lineSrvs, err := s.lineService.FromEntities(lines)
-	if err != nil {
-		return nil, err
-	}
-
-	return lineSrvs.ResolveBillablePeriod(ctx, lineservice.ResolveBillablePeriodInput{
-		AsOf:               in.AsOf,
-		ProgressiveBilling: in.ProgressiveBilling,
-	})
 }
 
 type withLockedStateMachineInput struct {
@@ -710,7 +372,7 @@ func (s *Service) RetryInvoice(ctx context.Context, input billing.RetryInvoiceIn
 		}
 
 		if _, err := s.updateInvoice(ctx, invoice); err != nil {
-			return billing.Invoice{}, fmt.Errorf("updating invoice[%s]: %w", invoice.ID, err)
+			return billing.Invoice{}, fmt.Errorf("updating invoice[%s]: %w", input.ID, err)
 		}
 
 		return s.executeTriggerOnInvoice(ctx, input, billing.TriggerRetry)
@@ -792,7 +454,7 @@ func (s *Service) executeTriggerOnInvoice(ctx context.Context, invoiceID billing
 					// This forces line ID generation for new or added lines
 					sm.Invoice, err = s.updateInvoice(ctx, sm.Invoice)
 					if err != nil {
-						return fmt.Errorf("updating invoice[%s]: %w", sm.Invoice.ID, err)
+						return fmt.Errorf("updating invoice[%s]: %w", invoiceID, err)
 					}
 				}
 
@@ -806,7 +468,7 @@ func (s *Service) executeTriggerOnInvoice(ctx context.Context, invoiceID billing
 
 					sm.Invoice, err = s.updateInvoice(ctx, sm.Invoice)
 					if err != nil {
-						return fmt.Errorf("updating invoice[%s]: %w", sm.Invoice.ID, err)
+						return fmt.Errorf("updating invoice[%s]: %w", invoiceID, err)
 					}
 
 					return nil
@@ -818,7 +480,7 @@ func (s *Service) executeTriggerOnInvoice(ctx context.Context, invoiceID billing
 
 				sm.Invoice, err = s.updateInvoice(ctx, sm.Invoice)
 				if err != nil {
-					return fmt.Errorf("updating invoice[%s]: %w", sm.Invoice.ID, err)
+					return fmt.Errorf("updating invoice[%s]: %w", invoiceID, err)
 				}
 
 				return nil
@@ -927,7 +589,7 @@ func (s *Service) UpdateInvoice(ctx context.Context, input billing.UpdateInvoice
 
 			invoice, err = s.updateInvoice(ctx, invoice)
 			if err != nil {
-				return billing.Invoice{}, fmt.Errorf("updating invoice[%s]: %w", invoice.ID, err)
+				return billing.Invoice{}, fmt.Errorf("updating invoice[%s]: %w", input.Invoice.ID, err)
 			}
 
 			// Auto delete the invoice if it has no lines, this needs to happen here, as we are in a
@@ -973,7 +635,7 @@ func (s *Service) UpdateInvoice(ctx context.Context, input billing.UpdateInvoice
 func (s Service) updateInvoice(ctx context.Context, in billing.UpdateInvoiceAdapterInput) (billing.Invoice, error) {
 	invoice, err := s.resolveStatusDetails(ctx, in)
 	if err != nil {
-		return billing.Invoice{}, fmt.Errorf("error resolving status details for invoice [%s]: %w", invoice.ID, err)
+		return billing.Invoice{}, fmt.Errorf("error resolving status details for invoice [%s]: %w", in.ID, err)
 	}
 
 	invoice, err = s.adapter.UpdateInvoice(ctx, invoice)
@@ -983,7 +645,7 @@ func (s Service) updateInvoice(ctx context.Context, in billing.UpdateInvoiceAdap
 
 	invoice, err = s.resolveWorkflowApps(ctx, invoice)
 	if err != nil {
-		return billing.Invoice{}, fmt.Errorf("error resolving workflow apps for invoice [%s]: %w", invoice.ID, err)
+		return billing.Invoice{}, fmt.Errorf("error resolving workflow apps for invoice [%s]: %w", in.ID, err)
 	}
 
 	return invoice, nil
@@ -992,7 +654,7 @@ func (s Service) updateInvoice(ctx context.Context, in billing.UpdateInvoiceAdap
 func (s Service) checkIfLinesAreInvoicable(ctx context.Context, invoice *billing.Invoice, progressiveBilling bool) error {
 	inScopeLineServices, err := s.lineService.FromEntities(
 		lo.Filter(invoice.Lines.OrEmpty(), func(line *billing.Line, _ int) bool {
-			return line.Status == billing.InvoiceLineStatusValid && line.DeletedAt == nil
+			return line.DeletedAt == nil
 		}),
 	)
 	if err != nil {
@@ -1223,15 +885,17 @@ func (s *Service) RecalculateGatheringInvoices(ctx context.Context, input billin
 				return fmt.Errorf("calculating gathering invoice: %w", err)
 			}
 
+			invoiceID := invoice.ID
+
 			invoice, err = s.updateInvoice(ctx, invoice)
 			if err != nil {
-				return fmt.Errorf("updating invoice[%s]: %w", invoice.ID, err)
+				return fmt.Errorf("updating invoice[%s]: %w", invoiceID, err)
 			}
 
 			if invoice.Lines.NonDeletedLineCount() == 0 {
 				if err := s.adapter.DeleteGatheringInvoices(ctx, billing.DeleteGatheringInvoicesInput{
 					Namespace:  input.Namespace,
-					InvoiceIDs: []string{invoice.ID},
+					InvoiceIDs: []string{invoiceID},
 				}); err != nil {
 					return fmt.Errorf("deleting gathering invoice: %w", err)
 				}

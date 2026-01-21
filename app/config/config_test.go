@@ -65,8 +65,7 @@ func TestComplete(t *testing.T) {
 		},
 		Environment: "local",
 		Telemetry: TelemetryConfig{
-			Address:         "127.0.0.1:10000",
-			AttributeSchema: AttributeSchemaTypeOTel,
+			Address: "127.0.0.1:10000",
 			Trace: TraceTelemetryConfig{
 				Sampler: "always",
 				Exporters: ExportersTraceTelemetryConfig{
@@ -144,6 +143,15 @@ func TestComplete(t *testing.T) {
 				MaxIdleConns:    5,
 				ConnMaxLifetime: 10 * time.Minute,
 				BlockBufferSize: 10,
+				Retry: ClickhouseQueryRetryConfig{
+					Enabled:           true,
+					MaxTries:          3,
+					RetryWaitDuration: 20 * time.Millisecond,
+				},
+				PoolMetrics: ClickhousePoolMetricsConfig{
+					Enabled:      true,
+					PollInterval: 5 * time.Second,
+				},
 			},
 			EventsTableName: "om_events",
 			AsyncInsert:     false,
@@ -300,19 +308,24 @@ func TestComplete(t *testing.T) {
 		},
 		Events: EventsConfiguration{
 			SystemEvents: EventSubsystemConfiguration{
-				Enabled: true,
-				Topic:   "om_sys.api_events",
+				Topic: "om_sys.api_events",
 				AutoProvision: AutoProvisionConfiguration{
 					Enabled:    true,
 					Partitions: 4,
 				},
 			},
 			IngestEvents: EventSubsystemConfiguration{
-				Enabled: true,
-				Topic:   "om_sys.ingest_events",
+				Topic: "om_sys.ingest_events",
 				AutoProvision: AutoProvisionConfiguration{
 					Enabled:    true,
 					Partitions: 8,
+				},
+			},
+			BalanceWorkerEvents: EventSubsystemConfiguration{
+				Topic: "om_sys.balance_worker_events",
+				AutoProvision: AutoProvisionConfiguration{
+					Enabled:    true,
+					Partitions: 4,
 				},
 			},
 		},
@@ -337,12 +350,15 @@ func TestComplete(t *testing.T) {
 				ConsumerGroupName: "om_balance_worker",
 			},
 			StateStorage: BalanceWorkerStateStorageConfiguration{
-				Driver: BalanceWorkerStateStorageDriverRedis,
-				BalanceWorkerStateStorageBackendConfiguration: BalanceWorkerStateStorageRedisBackendConfiguration{
-					Expiration: 23 * time.Hour,
-					Config: redis.Config{
-						Address: "127.0.0.1:6379",
-					},
+				HighWatermarkCache: BalanceWorkerHighWatermarkCacheConfiguration{
+					LRUCacheSize: 100_000,
+				},
+			},
+		},
+		ProductCatalog: ProductCatalogConfiguration{
+			Subscription: SubscriptionConfiguration{
+				MultiSubscriptionNamespaces: []string{
+					"multi-subscription",
 				},
 			},
 		},
@@ -370,6 +386,9 @@ func TestComplete(t *testing.T) {
 				EventTypeRegistrationTimeout:     notificationwebhook.DefaultRegistrationTimeout,
 				SkipEventTypeRegistrationOnError: false,
 			},
+			ReconcileInterval: time.Minute,
+			SendingTimeout:    time.Hour,
+			PendingTimeout:    2 * time.Hour,
 		},
 		Svix: svix.SvixConfig{
 			APIKey:    "test-svix-token",
@@ -400,6 +419,11 @@ func TestComplete(t *testing.T) {
 		Customer: CustomerConfiguration{
 			EnableSubjectHook: true,
 			IgnoreErrors:      true,
+		},
+		ReservedEventTypes: []string{
+			`^reserved\..*$`,
+			`^_\..*$`,
+			`^openmeter\..*$`,
 		},
 	}
 

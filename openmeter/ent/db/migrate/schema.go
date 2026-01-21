@@ -495,7 +495,8 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
-		{Name: "collection_alignment", Type: field.TypeEnum, Nullable: true, Enums: []string{"subscription"}},
+		{Name: "collection_alignment", Type: field.TypeEnum, Nullable: true, Enums: []string{"subscription", "anchored"}},
+		{Name: "anchored_alignment_detail", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "line_collection_period", Type: field.TypeString, Nullable: true},
 		{Name: "invoice_auto_advance", Type: field.TypeBool, Nullable: true},
 		{Name: "invoice_draft_period", Type: field.TypeString, Nullable: true},
@@ -514,13 +515,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "billing_customer_overrides_billing_profiles_billing_customer_override",
-				Columns:    []*schema.Column{BillingCustomerOverridesColumns[13]},
+				Columns:    []*schema.Column{BillingCustomerOverridesColumns[14]},
 				RefColumns: []*schema.Column{BillingProfilesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "billing_customer_overrides_customers_billing_customer_override",
-				Columns:    []*schema.Column{BillingCustomerOverridesColumns[14]},
+				Columns:    []*schema.Column{BillingCustomerOverridesColumns[15]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -544,7 +545,7 @@ var (
 			{
 				Name:    "billingcustomeroverride_namespace_customer_id",
 				Unique:  true,
-				Columns: []*schema.Column{BillingCustomerOverridesColumns[1], BillingCustomerOverridesColumns[14]},
+				Columns: []*schema.Column{BillingCustomerOverridesColumns[1], BillingCustomerOverridesColumns[15]},
 			},
 		},
 	}
@@ -581,7 +582,7 @@ var (
 		{Name: "supplier_tax_code", Type: field.TypeString, Nullable: true},
 		{Name: "customer_key", Type: field.TypeString, Nullable: true},
 		{Name: "customer_name", Type: field.TypeString},
-		{Name: "customer_usage_attribution", Type: field.TypeJSON},
+		{Name: "customer_usage_attribution", Type: field.TypeJSON, Nullable: true},
 		{Name: "number", Type: field.TypeString},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"standard", "credit-note"}},
 		{Name: "description", Type: field.TypeString, Nullable: true},
@@ -600,6 +601,8 @@ var (
 		{Name: "period_start", Type: field.TypeTime, Nullable: true},
 		{Name: "period_end", Type: field.TypeTime, Nullable: true},
 		{Name: "collection_at", Type: field.TypeTime, Nullable: true},
+		{Name: "payment_processing_entered_at", Type: field.TypeTime, Nullable: true},
+		{Name: "schema_level", Type: field.TypeInt, Default: 1},
 		{Name: "tax_app_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
 		{Name: "invoicing_app_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
 		{Name: "payment_app_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
@@ -615,37 +618,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "billing_invoices_apps_billing_invoice_tax_app",
-				Columns:    []*schema.Column{BillingInvoicesColumns[50]},
-				RefColumns: []*schema.Column{AppsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "billing_invoices_apps_billing_invoice_invoicing_app",
-				Columns:    []*schema.Column{BillingInvoicesColumns[51]},
-				RefColumns: []*schema.Column{AppsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "billing_invoices_apps_billing_invoice_payment_app",
 				Columns:    []*schema.Column{BillingInvoicesColumns[52]},
 				RefColumns: []*schema.Column{AppsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "billing_invoices_billing_profiles_billing_invoices",
+				Symbol:     "billing_invoices_apps_billing_invoice_invoicing_app",
 				Columns:    []*schema.Column{BillingInvoicesColumns[53]},
+				RefColumns: []*schema.Column{AppsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "billing_invoices_apps_billing_invoice_payment_app",
+				Columns:    []*schema.Column{BillingInvoicesColumns[54]},
+				RefColumns: []*schema.Column{AppsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "billing_invoices_billing_profiles_billing_invoices",
+				Columns:    []*schema.Column{BillingInvoicesColumns[55]},
 				RefColumns: []*schema.Column{BillingProfilesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "billing_invoices_billing_workflow_configs_billing_invoices",
-				Columns:    []*schema.Column{BillingInvoicesColumns[54]},
+				Columns:    []*schema.Column{BillingInvoicesColumns[56]},
 				RefColumns: []*schema.Column{BillingWorkflowConfigsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "billing_invoices_customers_billing_invoice",
-				Columns:    []*schema.Column{BillingInvoicesColumns[55]},
+				Columns:    []*schema.Column{BillingInvoicesColumns[57]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -669,12 +672,32 @@ var (
 			{
 				Name:    "billinginvoice_namespace_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{BillingInvoicesColumns[1], BillingInvoicesColumns[55]},
+				Columns: []*schema.Column{BillingInvoicesColumns[1], BillingInvoicesColumns[57]},
 			},
 			{
 				Name:    "billinginvoice_namespace_status",
 				Unique:  false,
 				Columns: []*schema.Column{BillingInvoicesColumns[1], BillingInvoicesColumns[42]},
+			},
+			{
+				Name:    "billinginvoice_namespace_period_start",
+				Unique:  false,
+				Columns: []*schema.Column{BillingInvoicesColumns[1], BillingInvoicesColumns[47]},
+			},
+			{
+				Name:    "billinginvoice_namespace_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BillingInvoicesColumns[1], BillingInvoicesColumns[3]},
+			},
+			{
+				Name:    "billinginvoice_namespace_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{BillingInvoicesColumns[1], BillingInvoicesColumns[4]},
+			},
+			{
+				Name:    "billinginvoice_namespace_issued_at",
+				Unique:  false,
+				Columns: []*schema.Column{BillingInvoicesColumns[1], BillingInvoicesColumns[36]},
 			},
 			{
 				Name:    "billinginvoice_status_details_cache",
@@ -684,6 +707,14 @@ var (
 					Types: map[string]string{
 						"postgres": "GIN",
 					},
+				},
+			},
+			{
+				Name:    "billinginvoice_namespace_customer_id_currency",
+				Unique:  true,
+				Columns: []*schema.Column{BillingInvoicesColumns[1], BillingInvoicesColumns[57], BillingInvoicesColumns[40]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL and status = 'gathering'",
 				},
 			},
 		},
@@ -1126,6 +1157,24 @@ var (
 			},
 		},
 	}
+	// BillingInvoiceWriteSchemaLevelsColumns holds the columns for the "billing_invoice_write_schema_levels" table.
+	BillingInvoiceWriteSchemaLevelsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "schema_level", Type: field.TypeInt},
+	}
+	// BillingInvoiceWriteSchemaLevelsTable holds the schema information for the "billing_invoice_write_schema_levels" table.
+	BillingInvoiceWriteSchemaLevelsTable = &schema.Table{
+		Name:       "billing_invoice_write_schema_levels",
+		Columns:    BillingInvoiceWriteSchemaLevelsColumns,
+		PrimaryKey: []*schema.Column{BillingInvoiceWriteSchemaLevelsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "billinginvoicewriteschemalevel_id",
+				Unique:  true,
+				Columns: []*schema.Column{BillingInvoiceWriteSchemaLevelsColumns[0]},
+			},
+		},
+	}
 	// BillingProfilesColumns holds the columns for the "billing_profiles" table.
 	BillingProfilesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
@@ -1233,6 +1282,158 @@ var (
 			},
 		},
 	}
+	// BillingStandardInvoiceDetailedLinesColumns holds the columns for the "billing_standard_invoice_detailed_lines" table.
+	BillingStandardInvoiceDetailedLinesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "namespace", Type: field.TypeString},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "currency", Type: field.TypeString, SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "tax_config", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "taxes_total", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "taxes_inclusive_total", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "taxes_exclusive_total", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "charges_total", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "discounts_total", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "total", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "service_period_start", Type: field.TypeTime},
+		{Name: "service_period_end", Type: field.TypeTime},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "invoicing_app_external_id", Type: field.TypeString, Nullable: true},
+		{Name: "child_unique_reference_id", Type: field.TypeString, Nullable: true},
+		{Name: "per_unit_amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "category", Type: field.TypeEnum, Enums: []string{"regular", "commitment"}, Default: "regular"},
+		{Name: "payment_term", Type: field.TypeEnum, Enums: []string{"in_advance", "in_arrears"}, Default: "in_advance"},
+		{Name: "index", Type: field.TypeInt, Nullable: true},
+		{Name: "invoice_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
+		{Name: "parent_line_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
+	}
+	// BillingStandardInvoiceDetailedLinesTable holds the schema information for the "billing_standard_invoice_detailed_lines" table.
+	BillingStandardInvoiceDetailedLinesTable = &schema.Table{
+		Name:       "billing_standard_invoice_detailed_lines",
+		Columns:    BillingStandardInvoiceDetailedLinesColumns,
+		PrimaryKey: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "billing_standard_invoice_detailed_lines_billing_invoices_billing_invoice_detailed_lines",
+				Columns:    []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[27]},
+				RefColumns: []*schema.Column{BillingInvoicesColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "billing_standard_invoice_detailed_lines_billing_invoice_lines_detailed_lines_v2",
+				Columns:    []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[28]},
+				RefColumns: []*schema.Column{BillingInvoiceLinesColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "billingstandardinvoicedetailedline_annotations",
+				Unique:  false,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[1]},
+				Annotation: &entsql.IndexAnnotation{
+					Types: map[string]string{
+						"postgres": "GIN",
+					},
+				},
+			},
+			{
+				Name:    "billingstandardinvoicedetailedline_id",
+				Unique:  true,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[0]},
+			},
+			{
+				Name:    "billingstandardinvoicedetailedline_namespace",
+				Unique:  false,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[2]},
+			},
+			{
+				Name:    "billingstandardinvoicedetailedline_namespace_id",
+				Unique:  true,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[2], BillingStandardInvoiceDetailedLinesColumns[0]},
+			},
+			{
+				Name:    "billingstandardinvoicedetailedline_namespace_invoice_id",
+				Unique:  false,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[2], BillingStandardInvoiceDetailedLinesColumns[27]},
+			},
+			{
+				Name:    "billingstandardinvoicedetailedline_namespace_parent_line_id",
+				Unique:  false,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[2], BillingStandardInvoiceDetailedLinesColumns[28]},
+			},
+			{
+				Name:    "billingstdinvdetailedline_ns_parent_child_id",
+				Unique:  true,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[2], BillingStandardInvoiceDetailedLinesColumns[28], BillingStandardInvoiceDetailedLinesColumns[22]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "child_unique_reference_id IS NOT NULL AND deleted_at IS NULL",
+				},
+			},
+		},
+	}
+	// BillingStandardInvoiceDetailedLineAmountDiscountsColumns holds the columns for the "billing_standard_invoice_detailed_line_amount_discounts" table.
+	BillingStandardInvoiceDetailedLineAmountDiscountsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
+		{Name: "namespace", Type: field.TypeString},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "child_unique_reference_id", Type: field.TypeString, Nullable: true},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "reason", Type: field.TypeEnum, Enums: []string{"maximum_spend", "ratecard_percentage", "ratecard_usage"}},
+		{Name: "invoicing_app_external_id", Type: field.TypeString, Nullable: true},
+		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "rounding_amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric"}},
+		{Name: "source_discount", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "line_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
+	}
+	// BillingStandardInvoiceDetailedLineAmountDiscountsTable holds the schema information for the "billing_standard_invoice_detailed_line_amount_discounts" table.
+	BillingStandardInvoiceDetailedLineAmountDiscountsTable = &schema.Table{
+		Name:       "billing_standard_invoice_detailed_line_amount_discounts",
+		Columns:    BillingStandardInvoiceDetailedLineAmountDiscountsColumns,
+		PrimaryKey: []*schema.Column{BillingStandardInvoiceDetailedLineAmountDiscountsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "billing_standard_invoice_detailed_line_amount_discounts_billing_standard_invoice_detailed_lines_amount_discounts",
+				Columns:    []*schema.Column{BillingStandardInvoiceDetailedLineAmountDiscountsColumns[12]},
+				RefColumns: []*schema.Column{BillingStandardInvoiceDetailedLinesColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "billingstandardinvoicedetailedlineamountdiscount_id",
+				Unique:  true,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLineAmountDiscountsColumns[0]},
+			},
+			{
+				Name:    "billingstandardinvoicedetailedlineamountdiscount_namespace",
+				Unique:  false,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLineAmountDiscountsColumns[1]},
+			},
+			{
+				Name:    "billingstandardinvoicedetailedlineamountdiscount_namespace_line_id",
+				Unique:  false,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLineAmountDiscountsColumns[1], BillingStandardInvoiceDetailedLineAmountDiscountsColumns[12]},
+			},
+			{
+				Name:    "billingstdinvdetailedlineamntdiscount_ns_parent_child_id",
+				Unique:  true,
+				Columns: []*schema.Column{BillingStandardInvoiceDetailedLineAmountDiscountsColumns[1], BillingStandardInvoiceDetailedLineAmountDiscountsColumns[12], BillingStandardInvoiceDetailedLineAmountDiscountsColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "child_unique_reference_id IS NOT NULL AND deleted_at IS NULL",
+				},
+			},
+		},
+	}
 	// BillingWorkflowConfigsColumns holds the columns for the "billing_workflow_configs" table.
 	BillingWorkflowConfigsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
@@ -1240,7 +1441,8 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
-		{Name: "collection_alignment", Type: field.TypeEnum, Enums: []string{"subscription"}},
+		{Name: "collection_alignment", Type: field.TypeEnum, Enums: []string{"subscription", "anchored"}},
+		{Name: "anchored_alignment_detail", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "line_collection_period", Type: field.TypeString},
 		{Name: "invoice_auto_advance", Type: field.TypeBool},
 		{Name: "invoice_draft_period", Type: field.TypeString},
@@ -1336,6 +1538,11 @@ var (
 				},
 			},
 			{
+				Name:    "customer_namespace_key_deleted_at",
+				Unique:  false,
+				Columns: []*schema.Column{CustomersColumns[1], CustomersColumns[16], CustomersColumns[5]},
+			},
+			{
 				Name:    "customer_name",
 				Unique:  false,
 				Columns: []*schema.Column{CustomersColumns[6]},
@@ -1427,13 +1634,12 @@ var (
 		{Name: "active_from", Type: field.TypeTime, Nullable: true},
 		{Name: "active_to", Type: field.TypeTime, Nullable: true},
 		{Name: "feature_key", Type: field.TypeString},
-		{Name: "subject_key", Type: field.TypeString},
 		{Name: "measure_usage_from", Type: field.TypeTime, Nullable: true},
 		{Name: "issue_after_reset", Type: field.TypeFloat64, Nullable: true},
 		{Name: "issue_after_reset_priority", Type: field.TypeUint8, Nullable: true},
 		{Name: "is_soft_limit", Type: field.TypeBool, Nullable: true},
 		{Name: "preserve_overage_at_reset", Type: field.TypeBool, Nullable: true},
-		{Name: "config", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "config", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "usage_period_interval", Type: field.TypeString, Nullable: true},
 		{Name: "usage_period_anchor", Type: field.TypeTime, Nullable: true},
 		{Name: "current_usage_period_start", Type: field.TypeTime, Nullable: true},
@@ -1441,7 +1647,6 @@ var (
 		{Name: "annotations", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "customer_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
 		{Name: "feature_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
-		{Name: "subject_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
 	}
 	// EntitlementsTable holds the schema information for the "entitlements" table.
 	EntitlementsTable = &schema.Table{
@@ -1451,20 +1656,14 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "entitlements_customers_entitlements",
-				Columns:    []*schema.Column{EntitlementsColumns[22]},
+				Columns:    []*schema.Column{EntitlementsColumns[21]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "entitlements_features_entitlement",
-				Columns:    []*schema.Column{EntitlementsColumns[23]},
+				Columns:    []*schema.Column{EntitlementsColumns[22]},
 				RefColumns: []*schema.Column{FeaturesColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "entitlements_subjects_entitlements",
-				Columns:    []*schema.Column{EntitlementsColumns[24]},
-				RefColumns: []*schema.Column{SubjectsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 		},
@@ -1487,37 +1686,27 @@ var (
 			{
 				Name:    "entitlement_namespace_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[22]},
-			},
-			{
-				Name:    "entitlement_namespace_subject_id",
-				Unique:  false,
-				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[24]},
-			},
-			{
-				Name:    "entitlement_namespace_subject_key",
-				Unique:  false,
-				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[10]},
+				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[21]},
 			},
 			{
 				Name:    "entitlement_namespace_id_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[0], EntitlementsColumns[22]},
+				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[0], EntitlementsColumns[21]},
 			},
 			{
 				Name:    "entitlement_namespace_feature_id_id",
 				Unique:  false,
-				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[23], EntitlementsColumns[0]},
+				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[22], EntitlementsColumns[0]},
 			},
 			{
 				Name:    "entitlement_namespace_current_usage_period_end",
 				Unique:  false,
-				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[20]},
+				Columns: []*schema.Column{EntitlementsColumns[1], EntitlementsColumns[19]},
 			},
 			{
 				Name:    "entitlement_current_usage_period_end_deleted_at",
 				Unique:  false,
-				Columns: []*schema.Column{EntitlementsColumns[20], EntitlementsColumns[5]},
+				Columns: []*schema.Column{EntitlementsColumns[19], EntitlementsColumns[5]},
 			},
 			{
 				Name:    "entitlement_created_at_id",
@@ -1538,6 +1727,7 @@ var (
 		{Name: "key", Type: field.TypeString},
 		{Name: "meter_slug", Type: field.TypeString, Nullable: true},
 		{Name: "meter_group_by_filters", Type: field.TypeJSON, Nullable: true},
+		{Name: "advanced_meter_group_by_filters", Type: field.TypeJSON, Nullable: true},
 		{Name: "archived_at", Type: field.TypeTime, Nullable: true},
 	}
 	// FeaturesTable holds the schema information for the "features" table.
@@ -1564,21 +1754,30 @@ var (
 					Where: "archived_at IS NULL",
 				},
 			},
+			{
+				Name:    "feature_namespace_meter_slug",
+				Unique:  false,
+				Columns: []*schema.Column{FeaturesColumns[5], FeaturesColumns[8]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "archived_at IS NULL",
+				},
+			},
 		},
 	}
 	// GrantsColumns holds the columns for the "grants" table.
 	GrantsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
 		{Name: "namespace", Type: field.TypeString},
-		{Name: "metadata", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric"}},
 		{Name: "priority", Type: field.TypeUint8, Default: 0},
 		{Name: "effective_at", Type: field.TypeTime},
-		{Name: "expiration", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
-		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "expiration", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 		{Name: "voided_at", Type: field.TypeTime, Nullable: true},
 		{Name: "reset_max_rollover", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric"}},
 		{Name: "reset_min_rollover", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "numeric"}},
@@ -1594,7 +1793,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "grants_entitlements_grant",
-				Columns:    []*schema.Column{GrantsColumns[16]},
+				Columns:    []*schema.Column{GrantsColumns[17]},
 				RefColumns: []*schema.Column{EntitlementsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -1611,14 +1810,24 @@ var (
 				Columns: []*schema.Column{GrantsColumns[1]},
 			},
 			{
+				Name:    "grant_annotations",
+				Unique:  false,
+				Columns: []*schema.Column{GrantsColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Types: map[string]string{
+						"postgres": "GIN",
+					},
+				},
+			},
+			{
 				Name:    "grant_namespace_owner_id",
 				Unique:  false,
-				Columns: []*schema.Column{GrantsColumns[1], GrantsColumns[16]},
+				Columns: []*schema.Column{GrantsColumns[1], GrantsColumns[17]},
 			},
 			{
 				Name:    "grant_effective_at_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{GrantsColumns[8], GrantsColumns[10]},
+				Columns: []*schema.Column{GrantsColumns[9], GrantsColumns[11]},
 			},
 		},
 	}
@@ -1633,6 +1842,7 @@ var (
 		{Name: "name", Type: field.TypeString},
 		{Name: "description", Type: field.TypeString, Nullable: true},
 		{Name: "key", Type: field.TypeString},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "event_type", Type: field.TypeString},
 		{Name: "value_property", Type: field.TypeString, Nullable: true},
 		{Name: "group_by", Type: field.TypeJSON, Nullable: true},
@@ -1666,12 +1876,27 @@ var (
 				Columns: []*schema.Column{MetersColumns[1], MetersColumns[8], MetersColumns[5]},
 			},
 			{
+				Name:    "meter_annotations",
+				Unique:  false,
+				Columns: []*schema.Column{MetersColumns[9]},
+				Annotation: &entsql.IndexAnnotation{
+					Types: map[string]string{
+						"postgres": "GIN",
+					},
+				},
+			},
+			{
 				Name:    "meter_namespace_key",
 				Unique:  true,
 				Columns: []*schema.Column{MetersColumns[1], MetersColumns[8]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "deleted_at IS NULL",
 				},
+			},
+			{
+				Name:    "meter_namespace_event_type",
+				Unique:  false,
+				Columns: []*schema.Column{MetersColumns[1], MetersColumns[10]},
 			},
 		},
 	}
@@ -1682,6 +1907,8 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"WEBHOOK"}},
 		{Name: "name", Type: field.TypeString},
 		{Name: "disabled", Type: field.TypeBool, Nullable: true, Default: false},
@@ -1704,6 +1931,16 @@ var (
 				Columns: []*schema.Column{NotificationChannelsColumns[1]},
 			},
 			{
+				Name:    "notificationchannel_annotations",
+				Unique:  false,
+				Columns: []*schema.Column{NotificationChannelsColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Types: map[string]string{
+						"postgres": "GIN",
+					},
+				},
+			},
+			{
 				Name:    "notificationchannel_namespace_id",
 				Unique:  false,
 				Columns: []*schema.Column{NotificationChannelsColumns[1], NotificationChannelsColumns[0]},
@@ -1711,7 +1948,7 @@ var (
 			{
 				Name:    "notificationchannel_namespace_type",
 				Unique:  false,
-				Columns: []*schema.Column{NotificationChannelsColumns[1], NotificationChannelsColumns[5]},
+				Columns: []*schema.Column{NotificationChannelsColumns[1], NotificationChannelsColumns[7]},
 			},
 		},
 	}
@@ -1719,10 +1956,10 @@ var (
 	NotificationEventsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
 		{Name: "namespace", Type: field.TypeString},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"entitlements.balance.threshold", "entitlements.reset", "invoice.created", "invoice.updated"}},
 		{Name: "payload", Type: field.TypeString, SchemaType: map[string]string{"postgres": "jsonb"}},
-		{Name: "annotations", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "rule_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "char(26)"}},
 	}
 	// NotificationEventsTable holds the schema information for the "notification_events" table.
@@ -1750,6 +1987,16 @@ var (
 				Columns: []*schema.Column{NotificationEventsColumns[1]},
 			},
 			{
+				Name:    "notificationevent_annotations",
+				Unique:  false,
+				Columns: []*schema.Column{NotificationEventsColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Types: map[string]string{
+						"postgres": "GIN",
+					},
+				},
+			},
+			{
 				Name:    "notificationevent_namespace_id",
 				Unique:  false,
 				Columns: []*schema.Column{NotificationEventsColumns[1], NotificationEventsColumns[0]},
@@ -1757,17 +2004,7 @@ var (
 			{
 				Name:    "notificationevent_namespace_type",
 				Unique:  false,
-				Columns: []*schema.Column{NotificationEventsColumns[1], NotificationEventsColumns[3]},
-			},
-			{
-				Name:    "notificationevent_annotations",
-				Unique:  false,
-				Columns: []*schema.Column{NotificationEventsColumns[5]},
-				Annotation: &entsql.IndexAnnotation{
-					Types: map[string]string{
-						"postgres": "GIN",
-					},
-				},
+				Columns: []*schema.Column{NotificationEventsColumns[1], NotificationEventsColumns[4]},
 			},
 		},
 	}
@@ -1775,12 +2012,15 @@ var (
 	NotificationEventDeliveryStatusColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
 		{Name: "namespace", Type: field.TypeString},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "event_id", Type: field.TypeString},
 		{Name: "channel_id", Type: field.TypeString},
-		{Name: "state", Type: field.TypeEnum, Enums: []string{"SUCCESS", "FAILED", "SENDING", "PENDING"}, Default: "PENDING"},
+		{Name: "state", Type: field.TypeEnum, Enums: []string{"SUCCESS", "FAILED", "SENDING", "PENDING", "RESENDING"}, Default: "PENDING"},
 		{Name: "reason", Type: field.TypeString, Nullable: true},
+		{Name: "next_attempt_at", Type: field.TypeTime, Nullable: true},
+		{Name: "attempts", Type: field.TypeJSON, Nullable: true},
 	}
 	// NotificationEventDeliveryStatusTable holds the schema information for the "notification_event_delivery_status" table.
 	NotificationEventDeliveryStatusTable = &schema.Table{
@@ -1799,6 +2039,16 @@ var (
 				Columns: []*schema.Column{NotificationEventDeliveryStatusColumns[1]},
 			},
 			{
+				Name:    "notificationeventdeliverystatus_annotations",
+				Unique:  false,
+				Columns: []*schema.Column{NotificationEventDeliveryStatusColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Types: map[string]string{
+						"postgres": "GIN",
+					},
+				},
+			},
+			{
 				Name:    "notificationeventdeliverystatus_namespace_id",
 				Unique:  false,
 				Columns: []*schema.Column{NotificationEventDeliveryStatusColumns[1], NotificationEventDeliveryStatusColumns[0]},
@@ -1806,12 +2056,17 @@ var (
 			{
 				Name:    "notificationeventdeliverystatus_namespace_event_id_channel_id",
 				Unique:  false,
-				Columns: []*schema.Column{NotificationEventDeliveryStatusColumns[1], NotificationEventDeliveryStatusColumns[4], NotificationEventDeliveryStatusColumns[5]},
+				Columns: []*schema.Column{NotificationEventDeliveryStatusColumns[1], NotificationEventDeliveryStatusColumns[5], NotificationEventDeliveryStatusColumns[6]},
 			},
 			{
 				Name:    "notificationeventdeliverystatus_namespace_state",
 				Unique:  false,
-				Columns: []*schema.Column{NotificationEventDeliveryStatusColumns[1], NotificationEventDeliveryStatusColumns[6]},
+				Columns: []*schema.Column{NotificationEventDeliveryStatusColumns[1], NotificationEventDeliveryStatusColumns[7]},
+			},
+			{
+				Name:    "notificationeventdeliverystatus_namespace_state_next_attempt_at",
+				Unique:  false,
+				Columns: []*schema.Column{NotificationEventDeliveryStatusColumns[1], NotificationEventDeliveryStatusColumns[7], NotificationEventDeliveryStatusColumns[9]},
 			},
 		},
 	}
@@ -1822,6 +2077,8 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"entitlements.balance.threshold", "entitlements.reset", "invoice.created", "invoice.updated"}},
 		{Name: "name", Type: field.TypeString},
 		{Name: "disabled", Type: field.TypeBool, Nullable: true, Default: false},
@@ -1844,6 +2101,16 @@ var (
 				Columns: []*schema.Column{NotificationRulesColumns[1]},
 			},
 			{
+				Name:    "notificationrule_annotations",
+				Unique:  false,
+				Columns: []*schema.Column{NotificationRulesColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Types: map[string]string{
+						"postgres": "GIN",
+					},
+				},
+			},
+			{
 				Name:    "notificationrule_namespace_id",
 				Unique:  false,
 				Columns: []*schema.Column{NotificationRulesColumns[1], NotificationRulesColumns[0]},
@@ -1851,7 +2118,7 @@ var (
 			{
 				Name:    "notificationrule_namespace_type",
 				Unique:  false,
-				Columns: []*schema.Column{NotificationRulesColumns[1], NotificationRulesColumns[5]},
+				Columns: []*schema.Column{NotificationRulesColumns[1], NotificationRulesColumns[7]},
 			},
 		},
 	}
@@ -2161,12 +2428,17 @@ var (
 				},
 			},
 			{
-				Name:    "subject_namespace_key_deleted_at",
+				Name:    "subject_namespace_key_deleted_at_unique",
 				Unique:  true,
 				Columns: []*schema.Column{SubjectsColumns[1], SubjectsColumns[5], SubjectsColumns[4]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "deleted_at IS NULL",
 				},
+			},
+			{
+				Name:    "subject_namespace_key_deleted_at",
+				Unique:  false,
+				Columns: []*schema.Column{SubjectsColumns[1], SubjectsColumns[5], SubjectsColumns[4]},
 			},
 			{
 				Name:    "subject_namespace_id",
@@ -2189,6 +2461,7 @@ var (
 	SubscriptionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
 		{Name: "namespace", Type: field.TypeString},
+		{Name: "annotations", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
@@ -2212,13 +2485,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "subscriptions_customers_subscription",
-				Columns:    []*schema.Column{SubscriptionsColumns[14]},
+				Columns:    []*schema.Column{SubscriptionsColumns[15]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "subscriptions_plans_subscriptions",
-				Columns:    []*schema.Column{SubscriptionsColumns[15]},
+				Columns:    []*schema.Column{SubscriptionsColumns[16]},
 				RefColumns: []*schema.Column{PlansColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -2235,6 +2508,16 @@ var (
 				Columns: []*schema.Column{SubscriptionsColumns[1]},
 			},
 			{
+				Name:    "subscription_annotations",
+				Unique:  false,
+				Columns: []*schema.Column{SubscriptionsColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Types: map[string]string{
+						"postgres": "GIN",
+					},
+				},
+			},
+			{
 				Name:    "subscription_namespace_id",
 				Unique:  false,
 				Columns: []*schema.Column{SubscriptionsColumns[1], SubscriptionsColumns[0]},
@@ -2242,7 +2525,7 @@ var (
 			{
 				Name:    "subscription_namespace_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{SubscriptionsColumns[1], SubscriptionsColumns[14]},
+				Columns: []*schema.Column{SubscriptionsColumns[1], SubscriptionsColumns[15]},
 			},
 		},
 	}
@@ -2328,6 +2611,46 @@ var (
 				Name:    "subscriptionaddonquantity_subscription_addon_id",
 				Unique:  false,
 				Columns: []*schema.Column{SubscriptionAddonQuantitiesColumns[7]},
+			},
+		},
+	}
+	// SubscriptionBillingSyncStatesColumns holds the columns for the "subscription_billing_sync_states" table.
+	SubscriptionBillingSyncStatesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
+		{Name: "namespace", Type: field.TypeString},
+		{Name: "has_billables", Type: field.TypeBool},
+		{Name: "synced_at", Type: field.TypeTime},
+		{Name: "next_sync_after", Type: field.TypeTime, Nullable: true},
+		{Name: "subscription_id", Type: field.TypeString, Unique: true, SchemaType: map[string]string{"postgres": "char(26)"}},
+	}
+	// SubscriptionBillingSyncStatesTable holds the schema information for the "subscription_billing_sync_states" table.
+	SubscriptionBillingSyncStatesTable = &schema.Table{
+		Name:       "subscription_billing_sync_states",
+		Columns:    SubscriptionBillingSyncStatesColumns,
+		PrimaryKey: []*schema.Column{SubscriptionBillingSyncStatesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "subscription_billing_sync_states_subscriptions_billing_sync_state",
+				Columns:    []*schema.Column{SubscriptionBillingSyncStatesColumns[5]},
+				RefColumns: []*schema.Column{SubscriptionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "subscriptionbillingsyncstate_id",
+				Unique:  true,
+				Columns: []*schema.Column{SubscriptionBillingSyncStatesColumns[0]},
+			},
+			{
+				Name:    "subscriptionbillingsyncstate_namespace",
+				Unique:  false,
+				Columns: []*schema.Column{SubscriptionBillingSyncStatesColumns[1]},
+			},
+			{
+				Name:    "subscriptionbillingsyncstate_namespace_subscription_id",
+				Unique:  true,
+				Columns: []*schema.Column{SubscriptionBillingSyncStatesColumns[1], SubscriptionBillingSyncStatesColumns[5]},
 			},
 		},
 	}
@@ -2585,8 +2908,11 @@ var (
 		BillingInvoiceSplitLineGroupsTable,
 		BillingInvoiceUsageBasedLineConfigsTable,
 		BillingInvoiceValidationIssuesTable,
+		BillingInvoiceWriteSchemaLevelsTable,
 		BillingProfilesTable,
 		BillingSequenceNumbersTable,
+		BillingStandardInvoiceDetailedLinesTable,
+		BillingStandardInvoiceDetailedLineAmountDiscountsTable,
 		BillingWorkflowConfigsTable,
 		CustomersTable,
 		CustomerSubjectsTable,
@@ -2606,6 +2932,7 @@ var (
 		SubscriptionsTable,
 		SubscriptionAddonsTable,
 		SubscriptionAddonQuantitiesTable,
+		SubscriptionBillingSyncStatesTable,
 		SubscriptionItemsTable,
 		SubscriptionPhasesTable,
 		UsageResetsTable,
@@ -2652,10 +2979,12 @@ func init() {
 	BillingProfilesTable.ForeignKeys[1].RefTable = AppsTable
 	BillingProfilesTable.ForeignKeys[2].RefTable = AppsTable
 	BillingProfilesTable.ForeignKeys[3].RefTable = BillingWorkflowConfigsTable
+	BillingStandardInvoiceDetailedLinesTable.ForeignKeys[0].RefTable = BillingInvoicesTable
+	BillingStandardInvoiceDetailedLinesTable.ForeignKeys[1].RefTable = BillingInvoiceLinesTable
+	BillingStandardInvoiceDetailedLineAmountDiscountsTable.ForeignKeys[0].RefTable = BillingStandardInvoiceDetailedLinesTable
 	CustomerSubjectsTable.ForeignKeys[0].RefTable = CustomersTable
 	EntitlementsTable.ForeignKeys[0].RefTable = CustomersTable
 	EntitlementsTable.ForeignKeys[1].RefTable = FeaturesTable
-	EntitlementsTable.ForeignKeys[2].RefTable = SubjectsTable
 	GrantsTable.ForeignKeys[0].RefTable = EntitlementsTable
 	NotificationEventsTable.ForeignKeys[0].RefTable = NotificationRulesTable
 	PlanAddonsTable.ForeignKeys[0].RefTable = AddonsTable
@@ -2668,6 +2997,7 @@ func init() {
 	SubscriptionAddonsTable.ForeignKeys[0].RefTable = AddonsTable
 	SubscriptionAddonsTable.ForeignKeys[1].RefTable = SubscriptionsTable
 	SubscriptionAddonQuantitiesTable.ForeignKeys[0].RefTable = SubscriptionAddonsTable
+	SubscriptionBillingSyncStatesTable.ForeignKeys[0].RefTable = SubscriptionsTable
 	SubscriptionItemsTable.ForeignKeys[0].RefTable = EntitlementsTable
 	SubscriptionItemsTable.ForeignKeys[1].RefTable = SubscriptionPhasesTable
 	SubscriptionPhasesTable.ForeignKeys[0].RefTable = SubscriptionsTable

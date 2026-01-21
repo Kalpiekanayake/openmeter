@@ -38,12 +38,16 @@ var Config = wire.NewSet(
 	// Notification
 	wire.FieldsOf(new(config.Configuration), "Notification"),
 	wire.FieldsOf(new(config.NotificationConfiguration), "Webhook"),
+	// Subscription
+	wire.FieldsOf(new(config.ProductCatalogConfiguration), "Subscription"),
 	// Portal
 	wire.FieldsOf(new(config.Configuration), "Portal"),
 	// ProductCatalog
 	wire.FieldsOf(new(config.Configuration), "ProductCatalog"),
 	// ProgressManager
 	wire.FieldsOf(new(config.Configuration), "ProgressManager"),
+	// Reserved Event Types
+	wire.FieldsOf(new(config.Configuration), "ReservedEventTypes"),
 	// Svix
 	wire.FieldsOf(new(config.Configuration), "Svix"),
 	// Telemetry

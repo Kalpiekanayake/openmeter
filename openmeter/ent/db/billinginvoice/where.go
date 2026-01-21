@@ -322,6 +322,16 @@ func CollectionAt(v time.Time) predicate.BillingInvoice {
 	return predicate.BillingInvoice(sql.FieldEQ(FieldCollectionAt, v))
 }
 
+// PaymentProcessingEnteredAt applies equality check predicate on the "payment_processing_entered_at" field. It's identical to PaymentProcessingEnteredAtEQ.
+func PaymentProcessingEnteredAt(v time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldEQ(FieldPaymentProcessingEnteredAt, v))
+}
+
+// SchemaLevel applies equality check predicate on the "schema_level" field. It's identical to SchemaLevelEQ.
+func SchemaLevel(v int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldEQ(FieldSchemaLevel, v))
+}
+
 // NamespaceEQ applies the EQ predicate on the "namespace" field.
 func NamespaceEQ(v string) predicate.BillingInvoice {
 	return predicate.BillingInvoice(sql.FieldEQ(FieldNamespace, v))
@@ -2175,6 +2185,16 @@ func CustomerNameContainsFold(v string) predicate.BillingInvoice {
 	return predicate.BillingInvoice(sql.FieldContainsFold(FieldCustomerName, v))
 }
 
+// CustomerUsageAttributionIsNil applies the IsNil predicate on the "customer_usage_attribution" field.
+func CustomerUsageAttributionIsNil() predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldIsNull(FieldCustomerUsageAttribution))
+}
+
+// CustomerUsageAttributionNotNil applies the NotNil predicate on the "customer_usage_attribution" field.
+func CustomerUsageAttributionNotNil() predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldNotNull(FieldCustomerUsageAttribution))
+}
+
 // NumberEQ applies the EQ predicate on the "number" field.
 func NumberEQ(v string) predicate.BillingInvoice {
 	return predicate.BillingInvoice(sql.FieldEQ(FieldNumber, v))
@@ -3534,6 +3554,96 @@ func CollectionAtNotNil() predicate.BillingInvoice {
 	return predicate.BillingInvoice(sql.FieldNotNull(FieldCollectionAt))
 }
 
+// PaymentProcessingEnteredAtEQ applies the EQ predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtEQ(v time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldEQ(FieldPaymentProcessingEnteredAt, v))
+}
+
+// PaymentProcessingEnteredAtNEQ applies the NEQ predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtNEQ(v time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldNEQ(FieldPaymentProcessingEnteredAt, v))
+}
+
+// PaymentProcessingEnteredAtIn applies the In predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtIn(vs ...time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldIn(FieldPaymentProcessingEnteredAt, vs...))
+}
+
+// PaymentProcessingEnteredAtNotIn applies the NotIn predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtNotIn(vs ...time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldNotIn(FieldPaymentProcessingEnteredAt, vs...))
+}
+
+// PaymentProcessingEnteredAtGT applies the GT predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtGT(v time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldGT(FieldPaymentProcessingEnteredAt, v))
+}
+
+// PaymentProcessingEnteredAtGTE applies the GTE predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtGTE(v time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldGTE(FieldPaymentProcessingEnteredAt, v))
+}
+
+// PaymentProcessingEnteredAtLT applies the LT predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtLT(v time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldLT(FieldPaymentProcessingEnteredAt, v))
+}
+
+// PaymentProcessingEnteredAtLTE applies the LTE predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtLTE(v time.Time) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldLTE(FieldPaymentProcessingEnteredAt, v))
+}
+
+// PaymentProcessingEnteredAtIsNil applies the IsNil predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtIsNil() predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldIsNull(FieldPaymentProcessingEnteredAt))
+}
+
+// PaymentProcessingEnteredAtNotNil applies the NotNil predicate on the "payment_processing_entered_at" field.
+func PaymentProcessingEnteredAtNotNil() predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldNotNull(FieldPaymentProcessingEnteredAt))
+}
+
+// SchemaLevelEQ applies the EQ predicate on the "schema_level" field.
+func SchemaLevelEQ(v int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldEQ(FieldSchemaLevel, v))
+}
+
+// SchemaLevelNEQ applies the NEQ predicate on the "schema_level" field.
+func SchemaLevelNEQ(v int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldNEQ(FieldSchemaLevel, v))
+}
+
+// SchemaLevelIn applies the In predicate on the "schema_level" field.
+func SchemaLevelIn(vs ...int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldIn(FieldSchemaLevel, vs...))
+}
+
+// SchemaLevelNotIn applies the NotIn predicate on the "schema_level" field.
+func SchemaLevelNotIn(vs ...int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldNotIn(FieldSchemaLevel, vs...))
+}
+
+// SchemaLevelGT applies the GT predicate on the "schema_level" field.
+func SchemaLevelGT(v int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldGT(FieldSchemaLevel, v))
+}
+
+// SchemaLevelGTE applies the GTE predicate on the "schema_level" field.
+func SchemaLevelGTE(v int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldGTE(FieldSchemaLevel, v))
+}
+
+// SchemaLevelLT applies the LT predicate on the "schema_level" field.
+func SchemaLevelLT(v int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldLT(FieldSchemaLevel, v))
+}
+
+// SchemaLevelLTE applies the LTE predicate on the "schema_level" field.
+func SchemaLevelLTE(v int) predicate.BillingInvoice {
+	return predicate.BillingInvoice(sql.FieldLTE(FieldSchemaLevel, v))
+}
+
 // HasSourceBillingProfile applies the HasEdge predicate on the "source_billing_profile" edge.
 func HasSourceBillingProfile() predicate.BillingInvoice {
 	return predicate.BillingInvoice(func(s *sql.Selector) {
@@ -3595,6 +3705,29 @@ func HasBillingInvoiceLines() predicate.BillingInvoice {
 func HasBillingInvoiceLinesWith(preds ...predicate.BillingInvoiceLine) predicate.BillingInvoice {
 	return predicate.BillingInvoice(func(s *sql.Selector) {
 		step := newBillingInvoiceLinesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasBillingInvoiceDetailedLines applies the HasEdge predicate on the "billing_invoice_detailed_lines" edge.
+func HasBillingInvoiceDetailedLines() predicate.BillingInvoice {
+	return predicate.BillingInvoice(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, BillingInvoiceDetailedLinesTable, BillingInvoiceDetailedLinesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasBillingInvoiceDetailedLinesWith applies the HasEdge predicate on the "billing_invoice_detailed_lines" edge with a given conditions (other predicates).
+func HasBillingInvoiceDetailedLinesWith(preds ...predicate.BillingStandardInvoiceDetailedLine) predicate.BillingInvoice {
+	return predicate.BillingInvoice(func(s *sql.Selector) {
+		step := newBillingInvoiceDetailedLinesStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)
